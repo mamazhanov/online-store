@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const app = express();
 
-// Настройка хранилища для файлов
+// Настройка загрузки фото
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = './uploads';
@@ -23,144 +23,103 @@ app.use('/uploads', express.static('uploads'));
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-async function initDB() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS products (
-      id SERIAL PRIMARY KEY,
-      title_en TEXT,
-      title_ru TEXT,
-      price DECIMAL,
-      image_path TEXT
-    )
-  `);
-}
-initDB();
-
 const style = `
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
-  body { font-family: 'Inter', sans-serif; margin: 0; color: #1a1a1a; background: #fff; line-height: 1.6; }
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=Montserrat:wght@300;400;600&display=swap');
   
-  /* Header */
-  nav { padding: 30px 8%; display: flex; justify-content: space-between; align-items: center; background: #fff; position: sticky; top: 0; z-index: 100; }
-  .logo { font-size: 20px; font-weight: 600; letter-spacing: 4px; text-transform: uppercase; text-decoration: none; color: #000; }
-  .nav-links a { text-decoration: none; color: #666; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; margin-left: 25px; transition: 0.3s; }
-  .nav-links a:hover { color: #000; }
-  .nav-links a.active { color: #000; border-bottom: 1px solid #000; padding-bottom: 4px; }
+  body { font-family: 'Montserrat', sans-serif; margin: 0; color: #333; background: #fff; }
+  h1, h2, h3 { font-family: 'Cormorant Garamond', serif; font-weight: 400; }
 
-  /* Hero Section */
-  .hero { height: 60vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: #f8f7f5; border-bottom: 1px solid #eee; }
-  .hero h1 { font-size: 42px; font-weight: 300; letter-spacing: -1px; margin: 0 0 15px 0; color: #1a1a1a; }
-  .hero p { font-size: 14px; color: #888; text-transform: uppercase; letter-spacing: 2px; margin: 0; }
+  nav { padding: 25px 5%; display: flex; justify-content: space-between; align-items: center; background: #fff; position: absolute; width: 90%; z-index: 10; }
+  .logo { font-size: 22px; letter-spacing: 3px; text-transform: uppercase; text-decoration: none; color: #000; font-weight: 600; }
+  .nav-links a { text-decoration: none; color: #444; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-left: 20px; }
 
-  /* Product Grid */
-  .container { max-width: 1400px; margin: 0 auto; padding: 80px 5%; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 60px 40px; }
-  
-  .product-card { text-decoration: none; color: inherit; display: block; group; }
-  .image-wrapper { width: 100%; height: 450px; overflow: hidden; background: #f2f2f2; margin-bottom: 20px; position: relative; }
-  .product-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
-  .product-card:hover .product-img { transform: scale(1.05); }
-  
-  .product-info { text-align: left; }
-  .product-title { font-size: 14px; font-weight: 400; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-  .product-price { font-size: 14px; color: #777; font-weight: 300; }
-
-  /* Admin Form */
-  .admin-container { max-width: 600px; margin: 100px auto; padding: 40px; }
-  h2 { font-weight: 400; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 40px; font-size: 18px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
-  label { font-size: 11px; text-transform: uppercase; color: #999; letter-spacing: 1px; display: block; margin-bottom: 8px; }
-  input { width: 100%; padding: 15px 0; border: none; border-bottom: 1px solid #ddd; margin-bottom: 30px; font-family: inherit; font-size: 14px; outline: none; transition: 0.3s; }
-  input:focus { border-bottom-color: #000; }
-  .btn { background: #000; color: #fff; padding: 18px; border: none; width: 100%; text-transform: uppercase; font-size: 12px; letter-spacing: 2px; cursor: pointer; transition: 0.3s; }
-  .btn:hover { background: #333; }
-  
-  @media (max-width: 768px) {
-    .hero h1 { font-size: 32px; }
-    .grid { gap: 30px; }
-    .image-wrapper { height: 350px; }
+  /* Hero Section по референсу */
+  .hero { 
+    height: 100vh; 
+    background: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url('https://images.unsplash.com/photo-1569330132151-69767228308d?q=80&w=2000'); 
+    background-size: cover; background-position: center;
+    display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
+    padding: 0 10%; color: #fff;
   }
+  .hero h1 { font-size: 80px; margin: 0; line-height: 0.9; }
+  .hero p { font-size: 18px; margin: 20px 0 40px; }
+  .shop-now { background: #fff; color: #000; padding: 15px 40px; text-decoration: none; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; }
+
+  /* Категории */
+  .categories { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px 5%; }
+  .cat-card { height: 400px; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; text-decoration: none; position: relative; }
+  .cat-card::after { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.2); }
+  .cat-card span { position: relative; z-index: 2; color: #fff; font-size: 40px; font-family: 'Cormorant Garamond', serif; }
+
+  /* Сетка товаров */
+  .featured-title { text-align: center; margin: 80px 0 40px; font-size: 36px; color: #555; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 5% 100px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 40px; }
+  .product-card { text-align: left; }
+  .image-wrapper { width: 100%; height: 350px; background: #f7f7f7; overflow: hidden; margin-bottom: 15px; }
+  .product-img { width: 100%; height: 100%; object-fit: cover; transition: 0.5s; }
+  .product-card:hover .product-img { transform: scale(1.05); }
+  .product-title { font-size: 14px; margin-bottom: 5px; color: #333; }
+  .product-price { font-size: 14px; color: #888; }
+
+  /* Админка */
+  .admin-form { max-width: 500px; margin: 100px auto; padding: 40px; border: 1px solid #eee; font-family: sans-serif; }
+  input { width: 100%; padding: 12px; margin: 10px 0 25px; border: 1px solid #ddd; }
 </style>
 `;
 
-// ГЛАВНАЯ
 app.get('/', async (req, res) => {
-  const lang = req.query.lang || 'en';
   const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
-  
-  const translations = {
-    en: { heroTitle: 'Authentic Craftsmanship', heroSub: 'Kyrgyz Modern Heritage', buy: 'View Details' },
-    ru: { heroTitle: 'Истинное Мастерство', heroSub: 'Наследие Kyrgyz Modern', buy: 'Подробнее' }
-  };
-  const t = translations[lang];
-
   let productsHtml = result.rows.map(p => `
     <div class="product-card">
-      <div class="image-wrapper">
-        <img src="${p.image_path || ''}" class="product-img">
-      </div>
-      <div class="product-info">
-        <div class="product-title">${lang === 'ru' ? (p.title_ru || p.title_en) : p.title_en}</div>
-        <div class="product-price">$${p.price}</div>
-      </div>
+      <div class="image-wrapper"><img src="${p.image_path}" class="product-img"></div>
+      <div class="product-title">${p.title_en}</div>
+      <div class="product-price">$${p.price}</div>
     </div>
   `).join('');
 
   res.send(`
     ${style}
     <nav>
-      <a href="/?lang=${lang}" class="logo">KYRGYZ MODERN</a>
-      <div class="nav-links">
-        <a href="/?lang=en" class="${lang === 'en' ? 'active' : ''}">EN</a>
-        <a href="/?lang=ru" class="${lang === 'ru' ? 'active' : ''}">RU</a>
-        <a href="/admin">ADMIN</a>
-      </div>
+      <a href="/" class="logo">KYRGYZ MODERN</a>
+      <div class="nav-links"><a href="/admin">ADMIN</a></div>
     </nav>
     <div class="hero">
-      <p>${t.heroSub}</p>
-      <h1>${t.heroTitle}</h1>
+      <h1>Tradition,<br>Reimagined.</h1>
+      <p>Heritage craft for the modern home</p>
+      <a href="#collection" class="shop-now">Shop Now</a>
     </div>
-    <div class="container">
-      <div class="grid">${productsHtml || '<p style="grid-column: 1/-1; text-align: center; color: #999;">The collection is coming soon.</p>'}</div>
+    <div class="categories">
+      <a href="#" class="cat-card" style="background-image: url('https://images.unsplash.com/photo-1605902711622-cf243b1217b5?q=80&w=1000')"><span>Clothing</span></a>
+      <a href="#" class="cat-card" style="background-image: url('https://images.unsplash.com/photo-1618108571493-68f449e7b288?q=80&w=1000')"><span>Tableware</span></a>
     </div>
+    <h2 class="featured-title" id="collection">Featured Collection</h2>
+    <div class="container"><div class="grid">${productsHtml}</div></div>
   `);
 });
 
-// АДМИНКА
 app.get('/admin', (req, res) => {
   res.send(`
     ${style}
-    <div class="admin-container">
-      <h2>Add to Collection</h2>
+    <div class="admin-form">
+      <h2>Add New Product</h2>
       <form action="/admin/add" method="POST" enctype="multipart/form-data">
-        <label>Product Title (English)</label>
-        <input name="title_en" required>
-        
-        <label>Название товара (Русский)</label>
-        <input name="title_ru" required>
-        
-        <label>Price in USD</label>
-        <input name="price" type="number" required>
-        
-        <label>Product Image</label>
-        <input name="image" type="file" accept="image/*" required style="border:none;">
-        
-        <button type="submit" class="btn">Confirm & Save</button>
+        <label>Title</label><input name="title_en" required>
+        <label>Price ($)</label><input name="price" type="number" required>
+        <label>Image File</label><input name="image" type="file" accept="image/*" required>
+        <button type="submit" class="shop-now" style="width:100%; border:none; cursor:pointer;">Save Product</button>
       </form>
-      <br><center><a href="/" style="color:#aaa; text-decoration:none; font-size:11px; letter-spacing:1px; text-transform:uppercase;">← Back to shop</a></center>
     </div>
   `);
 });
 
 app.post('/admin/add', upload.single('image'), async (req, res) => {
-  const { title_en, title_ru, price } = req.body;
-  const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
-  await pool.query(
-    'INSERT INTO products (title_en, title_ru, price, image_path) VALUES ($1, $2, $3, $4)', 
-    [title_en, title_ru, price, imagePath]
-  );
+  const { title_en, price } = req.body;
+  const imagePath = req.file ? `/uploads/${req.file.filename}` : '';
+  await pool.query('INSERT INTO products (title_en, price, image_path) VALUES ($1, $2, $3)', [title_en, price, imagePath]);
   res.redirect('/');
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Store running with new design and file uploads!'));
+app.listen(PORT, () => console.log('Final Design Ready!'));
