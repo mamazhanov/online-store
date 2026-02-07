@@ -3,7 +3,7 @@ const { Pool } = require('pg');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // Подключаем Stripe
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const app = express();
 
 cloudinary.config({
@@ -18,7 +18,7 @@ const storage = new CloudinaryStorage({
 });
 const upload = multer({ storage: storage });
 
-app.use(express.json()); // Нужно для обработки JSON от Stripe
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const pool = new Pool({ 
@@ -35,7 +35,6 @@ const style = `
   .hero { height: 100vh; background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('https://images.unsplash.com/photo-1569330132151-69767228308d?q=80&w=2000'); background-size: cover; background-position: center; display: flex; flex-direction: column; justify-content: center; padding: 0 10%; color: #fff; }
   .container { max-width: 1200px; margin: 80px auto; padding: 0 5%; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 40px; }
-  .product-card { text-align: left; }
   .image-wrapper { width: 100%; height: 380px; background: #f7f7f7; overflow: hidden; margin-bottom: 15px; }
   .product-img { width: 100%; height: 100%; object-fit: cover; }
   .buy-btn { border: 1px solid #000; background: none; padding: 12px 20px; text-transform: uppercase; font-size: 10px; letter-spacing: 2px; cursor: pointer; width: 100%; margin-top: 10px; transition: 0.3s; }
@@ -46,7 +45,6 @@ const style = `
 </style>
 `;
 
-// --- ГЛАВНАЯ ---
 app.get('/', async (req, res) => {
   const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
   let productsHtml = result.rows.map(p => `
@@ -75,7 +73,6 @@ app.get('/', async (req, res) => {
         <span>Total</span><span id="total-val">$0</span>
       </div>
       <button id="pay-button" class="buy-btn" style="background:#000; color:#fff; padding: 18px;" onclick="checkout()">Pay by Card</button>
-      <p style="text-align:center; font-size:10px; margin-top:15px; color:#888;">Secure payment via Stripe</p>
     </div>
 
     <script>
@@ -92,36 +89,27 @@ app.get('/', async (req, res) => {
         if (cart.length === 0) return alert('Bag is empty');
         const btn = document.getElementById('pay-button');
         btn.innerText = 'Processing...';
-        
         const response = await fetch('/create-checkout-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ items: cart })
         });
-        
         const session = await response.json();
-        if (session.url) {
-          window.location.href = session.url; // Перенаправляем на Stripe
-        } else {
-          alert('Error creating payment session');
-          btn.innerText = 'Pay by Card';
-        }
+        if (session.url) window.location.href = session.url;
+        else { alert('Error'); btn.innerText = 'Pay by Card'; }
       }
     </script>
   `);
 });
 
-// --- ЛОГИКА ОПЛАТЫ ---
 app.post('/create-checkout-session', async (req, res) => {
   try {
     const { items } = req.body;
-    
-    // Формируем товары для Stripe
     const lineItems = items.map(item => ({
       price_data: {
         currency: 'usd',
         product_data: { name: item.name },
-        unit_amount: item.price * 100, // Stripe считает в центах
+        unit_amount: item.price * 100,
       },
       quantity: 1,
     }));
@@ -130,43 +118,37 @@ app.post('/create-checkout-session', async (req, res) => {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: \`\${req.headers.origin}/?status=success\`,
-      cancel_url: \`\${req.headers.origin}/?status=cancel\`,
+      success_url: `${req.headers.origin}/?status=success`,
+      cancel_url: `${req.headers.origin}/?status=cancel`,
     });
 
     res.json({ url: session.url });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- АДМИНКА (без изменений) ---
 app.get('/admin', async (req, res) => {
   const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
-  let itemsList = result.rows.map(p => \`
+  let itemsList = result.rows.map(p => `
     <div class="admin-item">
-      <img src="\${p.image_path}" style="width:50px; height:50px; object-fit:cover;">
-      <div style="flex:1; font-size:12px;"><b>\${p.title_en}</b> - $\${p.price}</div>
-      <form action="/admin/delete/\${p.id}" method="POST"><button type="submit" style="color:red; border:none; background:none; cursor:pointer;">Delete</button></form>
+      <img src="${p.image_path}" style="width:50px; height:50px; object-fit:cover;">
+      <div style="flex:1; font-size:12px;"><b>${p.title_en}</b> - $${p.price}</div>
+      <form action="/admin/delete/${p.id}" method="POST"><button type="submit">Delete</button></form>
     </div>
-  \`).join('');
+  `).join('');
 
-  res.send(\`
-    \${style}
+  res.send(`
+    ${style}
     <div style="max-width:500px; margin:50px auto; padding:40px; border:1px solid #eee;">
-      <h2>Add Product</h2>
+      <h2>Admin</h2>
       <form action="/admin/add" method="POST" enctype="multipart/form-data">
-        <input name="title_en" placeholder="Title" required style="width:100%; padding:10px; margin-bottom:10px;">
-        <input name="price" type="number" placeholder="Price" required style="width:100%; padding:10px; margin-bottom:10px;">
-        <input name="image" type="file" required style="margin-bottom:20px;">
-        <button type="submit" class="buy-btn" style="background:#000; color:#fff;">Upload</button>
+        <input name="title_en" placeholder="Title" required style="width:100%; margin-bottom:10px;">
+        <input name="price" type="number" placeholder="Price" required style="width:100%; margin-bottom:10px;">
+        <input name="image" type="file" required>
+        <button type="submit">Upload</button>
       </form>
-      <hr style="margin:40px 0;">
-      <h3>Inventory</h3>
-      \${itemsList}
-      <br><a href="/">Back to Shop</a>
+      <hr>${itemsList}<br><a href="/">Back</a>
     </div>
-  \`);
+  `);
 });
 
 app.post('/admin/add', upload.single('image'), async (req, res) => {
