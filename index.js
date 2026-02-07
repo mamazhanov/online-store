@@ -6,7 +6,7 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const app = express();
 
-// Настройки Cloudinary
+// Настройки
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_NAME,
   api_key: process.env.CLOUDINARY_KEY,
@@ -37,21 +37,20 @@ const style = `
   
   /* НАВИГАЦИЯ */
   nav { padding: 30px 5%; display: flex; justify-content: space-between; align-items: center; position: absolute; width: 90%; z-index: 100; color: #fff; }
-  .logo { font-size: 24px; letter-spacing: 5px; text-transform: uppercase; text-decoration: none; color: #fff; font-weight: 600; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
-  .cart-link { cursor: pointer; text-transform: uppercase; font-size: 11px; letter-spacing: 2px; border-bottom: 1px solid rgba(255,255,255,0.5); padding-bottom: 5px; transition: 0.3s; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+  .logo { font-size: 24px; letter-spacing: 5px; text-transform: uppercase; text-decoration: none; color: #fff; font-weight: 600; }
+  .cart-link { cursor: pointer; text-transform: uppercase; font-size: 11px; letter-spacing: 2px; border-bottom: 1px solid rgba(255,255,255,0.5); padding-bottom: 5px; transition: 0.3s; }
   .cart-link:hover { border-color: #fff; }
 
-  /* ГЕРОЙ - ОБНОВЛЕННАЯ КАРТИНКА (ЮРТА) */
+  /* ГЕРОЙ (ФОН ОБНОВЛЕН) */
   .hero { 
     height: 100vh; 
-    /* Картинка с юртой крупным планом */
-    background: linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.1)), url('https://images.unsplash.com/photo-1628080698729-22a9c372b7a6?q=80&w=2500'); 
+    /* Используем новое изображение с юртой и горами */
+    background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.2)), url('https://images.unsplash.com/photo-1535025639604-9a804c092faa?q=80&w=2000'); 
     background-size: cover; 
-    background-position: center bottom; /* Центрируем по низу, чтобы юрта была видна */
+    background-position: center; 
     display: flex; flex-direction: column; justify-content: center; padding: 0 10%; color: #fff; 
   }
-  .hero h1 { font-size: clamp(40px, 8vw, 90px); margin: 0; line-height: 0.9; text-shadow: 0 4px 20px rgba(0,0,0,0.3); }
-  .hero p { text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+  .hero h1 { font-size: clamp(40px, 8vw, 90px); margin: 0; line-height: 0.9; }
 
   /* СЕТКА ТОВАРОВ */
   .container { max-width: 1400px; margin: 100px auto; padding: 0 5%; }
@@ -64,7 +63,7 @@ const style = `
   .buy-btn { border: 1px solid #1a1a1a; background: none; padding: 15px 25px; text-transform: uppercase; font-size: 11px; letter-spacing: 2px; cursor: pointer; width: 100%; transition: 0.3s; font-weight: 600; font-family: 'Montserrat'; }
   .buy-btn:hover { background: #1a1a1a; color: #fff; }
 
-  /* КОРЗИНА (FLEXBOX) */
+  /* КОРЗИНА (FLEXBOX - ИСПРАВЛЕННЫЙ СКРОЛЛ) */
   #cart-sidebar { 
     position: fixed; right: -550px; top: 0; width: 500px; height: 100%; 
     background: #fff; box-shadow: -20px 0 60px rgba(0,0,0,0.15); z-index: 1000; 
@@ -123,7 +122,7 @@ app.get('/', async (req, res) => {
         </nav>
 
         <div class="hero">
-          <p style="text-transform:uppercase; letter-spacing:4px; opacity:0.9; margin-bottom:15px; font-size:12px;">Est. 2026</p>
+          <p style="text-transform:uppercase; letter-spacing:4px; opacity:0.8; margin-bottom:15px; font-size:12px;">Est. 2026</p>
           <h1>Authentic Heritage.<br>Modern Soul.</h1>
         </div>
         
@@ -161,7 +160,7 @@ app.get('/', async (req, res) => {
         <div id="status-modal" class="modal-overlay">
           <div class="modal-content">
             <h2 id="modal-title">Thank You</h2>
-            <p id="modal-text" style="color:#666; font-size:13px; margin: 20px 0 30px;">Your order has been received.</p>
+            <p id="modal-text" style="color:#666; font-size:13px; margin: 20px 0 30px;">Your order has been received successfully.</p>
             <button class="buy-btn" onclick="closeModal()">Back to Shop</button>
           </div>
         </div>
