@@ -140,13 +140,10 @@ app.get('/', async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-// --- СЕРВЕР: STRIPE SESSION (Исправленный) ---
 app.post('/create-checkout-session', async (req, res) => {
   try {
     const { items, customer } = req.body;
-    
-    // Это поможет тебе увидеть в логах Railway, что пришло с фронтенда
-    console.log("Order Data:", customer); 
+    console.log("Order Data Received:", customer); 
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -159,12 +156,19 @@ app.post('/create-checkout-session', async (req, res) => {
         quantity: 1,
       })),
       mode: 'payment',
-      // Добавляем метаданные СТРОГО строковыми значениями
+      // Данные для сессии (то, что ты искал)
       metadata: {
-        "Customer_Name": String(customer.name),
-        "Address": String(customer.address),
-        "ZIP_Code": String(customer.zip),
-        "Items": items.map(i => i.name).join(', ')
+        "Customer_Name": customer.name,
+        "Shipping_Address": customer.address,
+        "ZIP": customer.zip
+      },
+      // ДАННЫЕ ДЛЯ ПЛАТЕЖА (чтобы точно появилось в Dashboard)
+      payment_intent_data: {
+        metadata: {
+          "Customer_Name": customer.name,
+          "Shipping_Address": customer.address,
+          "ZIP": customer.zip
+        }
       },
       success_url: `${req.headers.origin}/?status=success`,
       cancel_url: `${req.headers.origin}/?status=cancel`,
