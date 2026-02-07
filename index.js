@@ -140,31 +140,41 @@ app.get('/', async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-// --- СЕРВЕР: STRIPE SESSION ---
+// --- СЕРВЕР: STRIPE SESSION (Исправленный) ---
 app.post('/create-checkout-session', async (req, res) => {
   try {
     const { items, customer } = req.body;
     
+    // Это поможет тебе увидеть в логах Railway, что пришло с фронтенда
+    console.log("Order Data:", customer); 
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: items.map(i => ({
-        price_data: { currency: 'usd', product_data: { name: i.name }, unit_amount: i.price * 100 },
+        price_data: { 
+          currency: 'usd', 
+          product_data: { name: i.name }, 
+          unit_amount: i.price * 100 
+        },
         quantity: 1,
       })),
       mode: 'payment',
-      // МЕТАДАННЫЕ: Передаем информацию о клиенте в Stripe
+      // Добавляем метаданные СТРОГО строковыми значениями
       metadata: {
-        customer_name: customer.name,
-        shipping_address: customer.address,
-        postal_code: customer.zip,
-        order_items: items.map(i => i.name).join(', ')
+        "Customer_Name": String(customer.name),
+        "Address": String(customer.address),
+        "ZIP_Code": String(customer.zip),
+        "Items": items.map(i => i.name).join(', ')
       },
       success_url: `${req.headers.origin}/?status=success`,
       cancel_url: `${req.headers.origin}/?status=cancel`,
     });
 
     res.json({ url: session.url });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { 
+    console.error("Stripe Error:", err.message);
+    res.status(500).json({ error: err.message }); 
+  }
 });
 
 // --- АДМИНКА ---
