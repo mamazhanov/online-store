@@ -49,12 +49,29 @@ const style = `
   .hero h1 { font-size: clamp(40px, 8vw, 90px); margin: 0; line-height: 0.9; }
 
   .container { max-width: 1400px; margin: 100px auto; padding: 0 5%; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 60px 40px; }
+  
+  /* ОБНОВЛЕННАЯ СЕТКА: 4 колонки для ПК, 2 для мобильных */
+  .grid { 
+    display: grid; 
+    grid-template-columns: repeat(4, 1fr); 
+    gap: 40px 20px; 
+  }
+
+  @media (max-width: 1024px) {
+    .grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  @media (max-width: 768px) {
+    .grid { grid-template-columns: repeat(2, 1fr); gap: 20px 15px; }
+    .image-wrapper { height: 250px !important; }
+    #cart-sidebar { width: 100% !important; }
+  }
+
   .product-card { transition: 0.3s; }
-  .image-wrapper { width: 100%; height: 480px; background: #f4f4f4; overflow: hidden; margin-bottom: 20px; position: relative; }
+  .image-wrapper { width: 100%; height: 400px; background: #f4f4f4; overflow: hidden; margin-bottom: 15px; position: relative; }
   .product-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.8s ease; }
   
-  .buy-btn { border: 1px solid #1a1a1a; background: none; padding: 15px 25px; text-transform: uppercase; font-size: 11px; letter-spacing: 2px; cursor: pointer; width: 100%; transition: 0.3s; font-weight: 600; font-family: 'Montserrat'; }
+  .buy-btn { border: 1px solid #1a1a1a; background: none; padding: 15px 20px; text-transform: uppercase; font-size: 10px; letter-spacing: 2px; cursor: pointer; width: 100%; transition: 0.3s; font-weight: 600; font-family: 'Montserrat'; }
   .buy-btn:hover { background: #1a1a1a; color: #fff; }
 
   #cart-sidebar { 
@@ -68,13 +85,10 @@ const style = `
   .cart-body { padding: 0 40px; flex-grow: 1; overflow-y: auto; scrollbar-width: thin; }
   .cart-footer { padding: 30px 40px 40px 40px; flex-shrink: 0; border-top: 1px solid #eee; background: #fff; }
 
-  /* Стили миниатюр в корзине */
   .cart-item-img { width: 70px; height: 70px; object-fit: cover; background: #f9f9f9; }
-  .qty-btn { border: 1px solid #ddd; background: none; width: 28px; height: 28px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
-  .qty-btn:hover { border-color: #000; }
+  .qty-btn { border: 1px solid #ddd; background: none; width: 28px; height: 28px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
   
   .input-field { width: 100%; padding: 15px 0; margin-bottom: 10px; border: none; border-bottom: 1px solid #ddd; font-family: 'Montserrat'; font-size: 12px; outline: none; background: transparent; }
-  
   #shipping-form { display: none; margin-top: 30px; border-top: 1px solid #f5f5f5; padding-top: 30px; }
 
   .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
@@ -88,8 +102,8 @@ app.get('/', async (req, res) => {
     let productsHtml = result.rows.map(p => `
       <div class="product-card">
         <div class="image-wrapper"><img src="${p.image_path}" class="product-img"></div>
-        <div style="font-size:14px; text-transform:uppercase; font-weight:600; letter-spacing:1px; margin-bottom:5px;">${p.title_en}</div>
-        <div style="color:#666; margin-bottom:15px; font-family:'Cormorant Garamond'; font-size:22px; font-style:italic;">$${p.price}</div>
+        <div style="font-size:12px; text-transform:uppercase; font-weight:600; letter-spacing:1px; margin-bottom:5px;">${p.title_en}</div>
+        <div style="color:#666; margin-bottom:12px; font-family:'Cormorant Garamond'; font-size:20px; font-style:italic;">$${p.price}</div>
         <button class="buy-btn" onclick="addToCart('${p.title_en}', ${p.price}, '${p.image_path}')">Add to Bag</button>
       </div>
     `).join('');
@@ -119,7 +133,6 @@ app.get('/', async (req, res) => {
           
           <div class="cart-body">
             <div id="cart-items" style="margin: 30px 0;"></div>
-            
             <div id="shipping-form">
               <p style="text-transform:uppercase; font-size:10px; letter-spacing:2px; font-weight:600; margin-bottom:20px; color:#888;">Shipping Details</p>
               <input type="text" id="cust-name" class="input-field" placeholder="Full Name *">
@@ -148,10 +161,8 @@ app.get('/', async (req, res) => {
 
         <script>
           let cart = {}; 
-          
           function toggleCart() { 
             document.getElementById('cart-sidebar').classList.toggle('open'); 
-            // При закрытии возвращаем корзину в исходный вид (прячем форму)
             if (!document.getElementById('cart-sidebar').classList.contains('open')) {
                 document.getElementById('shipping-form').style.display = 'none';
                 const btn = document.getElementById('main-cart-btn');
@@ -159,26 +170,21 @@ app.get('/', async (req, res) => {
                 btn.onclick = showOrderForm;
             }
           }
-          
           function addToCart(n, p, img) { 
             if (cart[n]) cart[n].qty++;
             else cart[n] = { price: p, qty: 1, image: img };
             updateCart(); 
-            // Корзина НЕ открывается автоматически, как ты и просил
           }
-
           function changeQty(n, delta) {
             cart[n].qty += delta;
             if (cart[n].qty <= 0) delete cart[n];
             updateCart();
           }
-          
           function updateCart() {
             const itemsDiv = document.getElementById('cart-items');
             const keys = Object.keys(cart);
             let total = 0;
             let count = 0;
-
             itemsDiv.innerHTML = keys.map(n => {
               const item = cart[n];
               total += item.price * item.qty;
@@ -195,31 +201,20 @@ app.get('/', async (req, res) => {
                     <span style="font-size:13px; min-width:15px; text-align:center;">\${item.qty}</span>
                     <button class="qty-btn" onclick="changeQty('\${n}', 1)">+</button>
                   </div>
-                </div>
-              \`;
+                </div>\`;
             }).join('');
-
             document.getElementById('count').innerText = count;
             document.getElementById('total-val').innerText = '$' + total;
-            
             const btn = document.getElementById('main-cart-btn');
-            if (count === 0) {
-                itemsDiv.innerHTML = '<p style="text-align:center; opacity:0.4; margin-top:50px;">Your bag is empty</p>';
-                btn.style.display = 'none';
-            } else {
-                btn.style.display = 'block';
-            }
+            if (count === 0) { btn.style.display = 'none'; } else { btn.style.display = 'block'; }
           }
-
           function showOrderForm() {
             document.getElementById('shipping-form').style.display = 'block';
             const btn = document.getElementById('main-cart-btn');
             btn.innerText = 'Pay Now';
             btn.onclick = checkout;
-            // Плавный скролл к форме
             document.querySelector('.cart-body').scrollTo({ top: 1000, behavior: 'smooth' });
           }
-
           async function checkout() {
             const customer = {
               name: document.getElementById('cust-name').value,
@@ -228,14 +223,10 @@ app.get('/', async (req, res) => {
               address: document.getElementById('cust-address').value,
               zip: document.getElementById('cust-zip').value
             };
-
             if (!Object.values(customer).every(v => v.trim() !== '')) return alert('Please fill all fields');
-
             const btn = document.getElementById('main-cart-btn');
             btn.innerText = 'Redirecting...';
-
             const itemsArr = Object.keys(cart).map(n => ({ name: n, price: cart[n].price, qty: cart[n].qty }));
-
             try {
               const res = await fetch('/create-checkout-session', {
                 method: 'POST',
@@ -244,17 +235,9 @@ app.get('/', async (req, res) => {
               });
               const { url } = await res.json();
               if (url) window.location.href = url;
-            } catch (e) {
-              alert('Error');
-              btn.innerText = 'Pay Now';
-            }
+            } catch (e) { alert('Error'); btn.innerText = 'Pay Now'; }
           }
-
-          window.onload = () => {
-            if (new URLSearchParams(window.location.search).get('status') === 'success') 
-              document.getElementById('status-modal').style.display = 'flex';
-          };
-          
+          window.onload = () => { if (new URLSearchParams(window.location.search).get('status') === 'success') document.getElementById('status-modal').style.display = 'flex'; };
           function closeModal() { window.location.href = '/'; }
         </script>
       </body>
@@ -263,6 +246,7 @@ app.get('/', async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
+// ПЛАТЕЖИ И АДМИНКА
 app.post('/create-checkout-session', async (req, res) => {
   try {
     const { items, customer } = req.body;
@@ -282,7 +266,6 @@ app.post('/create-checkout-session', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// АДМИНКА (Без изменений)
 app.get('/admin', async (req, res) => {
   const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
   const items = result.rows.map(p => `
