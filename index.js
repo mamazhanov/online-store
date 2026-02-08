@@ -45,7 +45,7 @@ const style = `
   .hero { 
     height: 100vh; 
     /* Используем новое изображение с юртой и горами */
-    background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.2)), url('https://images.unsplash.com/photo-1535025639604-9a804c092faa?q=80&w=2000'); 
+    background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.2)), url('https://res.cloudinary.com/duiel8ksn/image/upload/v1770544217/ChatGPT_Image_8_%D1%84%D0%B5%D0%B2%D1%80._2026_%D0%B3._15_48_06_nifdei.png'); 
     background-size: cover; 
     background-position: center; 
     display: flex; flex-direction: column; justify-content: center; padding: 0 10%; color: #fff; 
