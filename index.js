@@ -50,11 +50,12 @@ const style = `
 
   .container { max-width: 1400px; margin: 100px auto; padding: 0 5%; }
   
-  /* ОБНОВЛЕННАЯ СЕТКА: 4 колонки для ПК, 2 для мобильных */
+  /* СЕТКА: 4 колонки ПК, 2 мобильные */
   .grid { 
     display: grid; 
     grid-template-columns: repeat(4, 1fr); 
-    gap: 40px 20px; 
+    gap: 40px 20px;
+    align-items: stretch;
   }
 
   @media (max-width: 1024px) {
@@ -62,16 +63,74 @@ const style = `
   }
 
   @media (max-width: 768px) {
-    .grid { grid-template-columns: repeat(2, 1fr); gap: 20px 15px; }
-    .image-wrapper { height: 250px !important; }
+    .grid { grid-template-columns: repeat(2, 1fr); gap: 20px 12px; }
+    .image-wrapper { height: 260px !important; }
     #cart-sidebar { width: 100% !important; }
   }
 
-  .product-card { transition: 0.3s; }
-  .image-wrapper { width: 100%; height: 400px; background: #f4f4f4; overflow: hidden; margin-bottom: 15px; position: relative; }
+  /* Исправленная карточка товара */
+  .product-card { 
+    display: flex; 
+    flex-direction: column; 
+    height: 100%; 
+    transition: 0.3s; 
+  }
+
+  .image-wrapper { 
+    width: 100%; 
+    height: 380px; 
+    background: #f4f4f4; 
+    overflow: hidden; 
+    margin-bottom: 15px; 
+    flex-shrink: 0; 
+  }
+
   .product-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.8s ease; }
   
-  .buy-btn { border: 1px solid #1a1a1a; background: none; padding: 15px 20px; text-transform: uppercase; font-size: 10px; letter-spacing: 2px; cursor: pointer; width: 100%; transition: 0.3s; font-weight: 600; font-family: 'Montserrat'; }
+  /* Контейнер для текста, который заставляет кнопку падать вниз */
+  .product-info {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px;
+  }
+
+  .product-title {
+    font-size: 11px; 
+    text-transform: uppercase; 
+    font-weight: 600; 
+    letter-spacing: 1px; 
+    margin-bottom: 5px;
+    /* Обрезка текста до 2 строк */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 2.8em; /* Чтобы блоки были одной высоты даже с коротким текстом */
+  }
+
+  .product-price {
+    color: #666; 
+    font-family: 'Cormorant Garamond'; 
+    font-size: 20px; 
+    font-style: italic;
+    margin-top: auto; /* Прижать к кнопке */
+  }
+
+  .buy-btn { 
+    border: 1px solid #1a1a1a; 
+    background: none; 
+    padding: 15px 20px; 
+    text-transform: uppercase; 
+    font-size: 10px; 
+    letter-spacing: 2px; 
+    cursor: pointer; 
+    width: 100%; 
+    transition: 0.3s; 
+    font-weight: 600; 
+    font-family: 'Montserrat'; 
+  }
+
   .buy-btn:hover { background: #1a1a1a; color: #fff; }
 
   #cart-sidebar { 
@@ -102,8 +161,10 @@ app.get('/', async (req, res) => {
     let productsHtml = result.rows.map(p => `
       <div class="product-card">
         <div class="image-wrapper"><img src="${p.image_path}" class="product-img"></div>
-        <div style="font-size:12px; text-transform:uppercase; font-weight:600; letter-spacing:1px; margin-bottom:5px;">${p.title_en}</div>
-        <div style="color:#666; margin-bottom:12px; font-family:'Cormorant Garamond'; font-size:20px; font-style:italic;">$${p.price}</div>
+        <div class="product-info">
+          <div class="product-title">${p.title_en}</div>
+          <div class="product-price">$${p.price}</div>
+        </div>
         <button class="buy-btn" onclick="addToCart('${p.title_en}', ${p.price}, '${p.image_path}')">Add to Bag</button>
       </div>
     `).join('');
