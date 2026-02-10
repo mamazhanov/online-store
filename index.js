@@ -84,8 +84,10 @@ const style = `
 
   @media (max-width: 768px) { 
     .grid { grid-template-columns: repeat(2, 1fr); }
-    .product-detail-content { flex-direction: column; }
-    .product-detail-img { width: 100%; height: 300px; }
+    .product-detail-content { flex-direction: column; width: 95%; }
+    /* ФИКСИРОВАННЫЙ РАЗМЕР КАРТИНКИ В МОДАЛКЕ ДЛЯ МОБИЛОК */
+    .product-detail-img { width: 100%; height: 40vh; min-height: 300px; object-fit: cover; }
+    .product-detail-info { padding: 30px 20px; }
     #cart-sidebar { width: 100%; }
   }
 </style>
@@ -127,15 +129,12 @@ app.get('/', async (req, res) => {
       
       <div id="cart-sidebar">
         <div class="cart-header"><h2 style="margin:0;">Your Bag</h2></div>
-        
         <div class="cart-body"><div id="cart-items"></div><div id="shipping-form" style="display:none; margin-top:30px;">
           <input id="cust-name" class="input-field" placeholder="Full Name"><input id="cust-email" class="input-field" placeholder="Email">
         </div></div>
-        
         <div class="cart-footer">
           <div style="display:flex; justify-content:space-between; margin-bottom:20px;"><span>Total</span><span id="total-val">$0</span></div>
           <button id="main-cart-btn" class="buy-btn" style="background:#1a1a1a; color:#fff;" onclick="showOrderForm()">Checkout</button>
-          
           <button class="buy-btn" onclick="toggleCart()" style="margin-top: 15px;">&rarr; Back</button>
         </div>
       </div>
@@ -156,7 +155,6 @@ app.get('/', async (req, res) => {
         function addToCart(n, p, img) {
           if (cart[n]) cart[n].qty++; else cart[n] = { price: p, qty: 1, image: img };
           updateCart(); 
-          // АВТОМАТИЧЕСКОЕ ОТКРЫТИЕ КОРЗИНЫ УБРАНО
         }
         function changeQty(n, d) { cart[n].qty += d; if (cart[n].qty <= 0) delete cart[n]; updateCart(); }
         function updateCart() {
@@ -178,6 +176,7 @@ app.get('/', async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
+// Админские роуты оставлены без изменений
 app.get('/admin', async (req, res) => {
   const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
   const list = result.rows.map(p => `
@@ -188,34 +187,13 @@ app.get('/admin', async (req, res) => {
         <form action="/admin/delete/${p.id}" method="POST"><button style="color:red; background:none; border:none; cursor:pointer; font-size:10px; text-transform:uppercase;">Delete</button></form>
       </div>
     </div>`).join('');
-
-  res.send(`${style}<div style="max-width:600px; margin:50px auto; padding:40px; border:1px solid #eee;">
-    <h2>Admin Panel</h2>
-    <form action="/admin/add" method="POST" enctype="multipart/form-data">
-      <input name="title_en" placeholder="Product Title" required class="input-field">
-      <input name="price" type="number" placeholder="Price" required class="input-field">
-      <textarea name="description_en" placeholder="Description" class="input-field" style="height:80px;"></textarea>
-      <input name="image" type="file" required style="margin:20px 0;">
-      <button type="submit" class="buy-btn" style="background:#1a1a1a; color:#fff;">Add Product</button>
-    </form>
-    <div style="margin-top:40px;">${list}</div>
-  </div>`);
+  res.send(`${style}<div style="max-width:600px; margin:50px auto; padding:40px; border:1px solid #eee;"><h2>Admin Panel</h2><form action="/admin/add" method="POST" enctype="multipart/form-data"><input name="title_en" placeholder="Product Title" required class="input-field"><input name="price" type="number" placeholder="Price" required class="input-field"><textarea name="description_en" placeholder="Description" class="input-field" style="height:80px;"></textarea><input name="image" type="file" required style="margin:20px 0;"><button type="submit" class="buy-btn" style="background:#1a1a1a; color:#fff;">Add Product</button></form><div style="margin-top:40px;">${list}</div></div>`);
 });
 
 app.get('/admin/edit/:id', async (req, res) => {
   const result = await pool.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
   const p = result.rows[0];
-  res.send(`${style}<div style="max-width:600px; margin:50px auto; padding:40px; border:1px solid #eee;">
-    <h2>Edit Product</h2>
-    <form action="/admin/edit/${p.id}" method="POST" enctype="multipart/form-data">
-      <input name="title_en" value="${p.title_en}" required class="input-field">
-      <input name="price" type="number" value="${p.price}" required class="input-field">
-      <textarea name="description_en" class="input-field" style="height:100px;">${p.description_en || ''}</textarea>
-      <div style="margin:20px 0;"><img src="${p.image_path}" style="width:100px; display:block; margin-bottom:10px;"><input name="image" type="file"></div>
-      <button type="submit" class="buy-btn" style="background:#1a1a1a; color:#fff;">Save Changes</button>
-      <a href="/admin" style="display:block; margin-top:20px; font-size:10px; text-align:center; color:#666; text-decoration:none;">CANCEL</a>
-    </form>
-  </div>`);
+  res.send(`${style}<div style="max-width:600px; margin:50px auto; padding:40px; border:1px solid #eee;"><h2>Edit Product</h2><form action="/admin/edit/${p.id}" method="POST" enctype="multipart/form-data"><input name="title_en" value="${p.title_en}" required class="input-field"><input name="price" type="number" value="${p.price}" required class="input-field"><textarea name="description_en" class="input-field" style="height:100px;">${p.description_en || ''}</textarea><div style="margin:20px 0;"><img src="${p.image_path}" style="width:100px; display:block; margin-bottom:10px;"><input name="image" type="file"></div><button type="submit" class="buy-btn" style="background:#1a1a1a; color:#fff;">Save Changes</button><a href="/admin" style="display:block; margin-top:20px; font-size:10px; text-align:center; color:#666; text-decoration:none;">CANCEL</a></form></div>`);
 });
 
 app.post('/admin/edit/:id', upload.single('image'), async (req, res) => {
