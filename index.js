@@ -72,8 +72,7 @@ const style = `
   .product-detail-img { width: 55%; height: 700px; object-fit: cover; }
   .product-detail-info { padding: 60px; display: flex; flex-direction: column; flex-grow: 1; justify-content: center; }
   
-  /* Стандартная кнопка закрытия (для ПК) */
-  .close-detail { position: absolute; top: 30px; right: 30px; cursor: pointer; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.5; z-index: 3005; }
+  /* Кнопка закрытия сверху УДАЛЕНА, так как мы перенесли её вниз */
 
   #cart-sidebar { position: fixed; right: -550px; top: 0; width: 500px; height: 100%; background: #fff; box-shadow: -20px 0 60px rgba(0,0,0,0.15); z-index: 2000; transition: 0.5s cubic-bezier(0.2, 1, 0.3, 1); display: flex; flex-direction: column; }
   #cart-sidebar.open { right: 0; }
@@ -90,18 +89,6 @@ const style = `
     .product-detail-content { flex-direction: column; }
     .product-detail-img { width: 100%; height: 300px; }
     #cart-sidebar { width: 100%; }
-    
-    /* ФИКС ДЛЯ МОБИЛЬНЫХ: Кнопка закрытия прилипает к экрану */
-    .close-detail {
-      position: fixed; /* Теперь она зафиксирована относительно экрана */
-      top: 20px; 
-      right: 20px; 
-      background: rgba(255, 255, 255, 0.9); /* Добавил фон, чтобы было видно на фото */
-      padding: 8px 12px; 
-      opacity: 1; 
-      border-radius: 4px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    }
   }
 </style>
 `;
@@ -129,9 +116,16 @@ app.get('/', async (req, res) => {
 
       <div id="product-detail" class="product-detail-overlay" onclick="closeDetail()">
         <div class="product-detail-content" onclick="event.stopPropagation()">
-          <div class="close-detail" onclick="closeDetail()">Back [×]</div>
           <img id="detail-img" src="" class="product-detail-img">
-          <div class="product-detail-info"><h2 id="detail-title"></h2><div id="detail-price"></div><p id="detail-desc"></p><button id="detail-buy-btn" class="buy-btn">Add to Bag</button></div>
+          <div class="product-detail-info">
+            <h2 id="detail-title"></h2>
+            <div id="detail-price"></div>
+            <p id="detail-desc"></p>
+            
+            <button id="detail-buy-btn" class="buy-btn">Add to Bag</button>
+            
+            <button class="buy-btn" onclick="closeDetail()" style="margin-top: 15px;">&larr; Back</button>
+          </div>
         </div>
       </div>
       
