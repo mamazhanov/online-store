@@ -68,8 +68,6 @@ const style = `
   .buy-btn:hover { background: #1a1a1a; color: #fff; }
 
   .product-detail-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 3000; display: none; align-items: center; justify-content: center; }
-  
-  /* УБРАН СКРОЛЛ ДЛЯ БОЛЬШИХ ЭКРАНОВ */
   .product-detail-content { background: #fff; width: 90%; max-width: 1100px; height: 700px; display: flex; position: relative; overflow: hidden; }
   .product-detail-img { width: 55%; height: 100%; object-fit: cover; }
   .product-detail-info { padding: 60px; display: flex; flex-direction: column; flex-grow: 1; justify-content: center; overflow-y: auto; }
@@ -82,7 +80,7 @@ const style = `
   
   .cart-item-img { width: 80px; height: 80px; object-fit: cover; }
   .qty-btn { border: 1px solid #ddd; background: none; width: 30px; height: 30px; cursor: pointer; }
-  .input-field { width: 100%; padding: 15px 0; margin-bottom: 15px; border: none; border-bottom: 1px solid #ddd; outline: none; font-family: inherit; }
+  .input-field { width: 100%; padding: 20px 0; margin-bottom: 25px; border: none; border-bottom: 1px solid #ddd; outline: none; font-family: inherit; font-size: 14px; letter-spacing: 1px; }
 
   @media (max-width: 768px) { 
     .grid { grid-template-columns: repeat(2, 1fr); }
@@ -130,9 +128,16 @@ app.get('/', async (req, res) => {
       
       <div id="cart-sidebar">
         <div class="cart-header"><h2 style="margin:0;">Your Bag</h2></div>
-        <div class="cart-body"><div id="cart-items"></div><div id="shipping-form" style="display:none; margin-top:30px;">
-          <input id="cust-name" class="input-field" placeholder="Full Name"><input id="cust-email" class="input-field" placeholder="Email">
-        </div></div>
+        <div class="cart-body">
+          <div id="cart-items"></div>
+          <div id="shipping-form" style="display:none; margin-top:30px;">
+            <input id="cust-name" class="input-field" placeholder="Full Name">
+            <input id="cust-email" class="input-field" placeholder="Email">
+            <input id="cust-phone" class="input-field" placeholder="Phone Number">
+            <input id="cust-address" class="input-field" placeholder="Shipping Address">
+            <input id="cust-zip" class="input-field" placeholder="ZIP / Postal Code">
+          </div>
+        </div>
         <div class="cart-footer">
           <div style="display:flex; justify-content:space-between; margin-bottom:20px;"><span>Total</span><span id="total-val">$0</span></div>
           <button id="main-cart-btn" class="buy-btn" style="background:#1a1a1a; color:#fff;" onclick="showOrderForm()">Checkout</button>
@@ -167,9 +172,20 @@ app.get('/', async (req, res) => {
           document.getElementById('count').innerText = count; document.getElementById('total-val').innerText = '$' + total;
         }
         function showOrderForm() { document.getElementById('shipping-form').style.display = 'block'; document.getElementById('main-cart-btn').innerText = 'Pay Now'; document.getElementById('main-cart-btn').onclick = checkout; }
+        
         async function checkout() {
-            const customer = { name: document.getElementById('cust-name').value, email: document.getElementById('cust-email').value };
-            const res = await fetch('/create-checkout-session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: Object.keys(cart).map(n => ({ name: n, price: cart[n].price, qty: cart[n].qty })), customer }) });
+            const customer = { 
+              name: document.getElementById('cust-name').value, 
+              email: document.getElementById('cust-email').value,
+              phone: document.getElementById('cust-phone').value,
+              address: document.getElementById('cust-address').value,
+              zip: document.getElementById('cust-zip').value
+            };
+            const res = await fetch('/create-checkout-session', { 
+              method: 'POST', 
+              headers: { 'Content-Type': 'application/json' }, 
+              body: JSON.stringify({ items: Object.keys(cart).map(n => ({ name: n, price: cart[n].price, qty: cart[n].qty })), customer }) 
+            });
             const { url } = await res.json(); if (url) window.location.href = url;
         }
       </script>
@@ -207,6 +223,12 @@ app.post('/create-checkout-session', async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       customer_email: customer.email,
+      metadata: {
+        name: customer.name,
+        phone: customer.phone,
+        address: customer.address,
+        zip: customer.zip
+      },
       line_items: items.map(i => ({ price_data: { currency: 'usd', product_data: { name: i.name }, unit_amount: i.price * 100 }, quantity: i.qty })),
       mode: 'payment', success_url: `${req.headers.origin}/?status=success`, cancel_url: `${req.headers.origin}/?status=cancel`,
     });
