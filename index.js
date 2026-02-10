@@ -53,20 +53,9 @@ const style = `
   .product-img { width: 100%; height: 100%; object-fit: cover; transition: 0.6s cubic-bezier(0.2, 1, 0.3, 1); }
   .product-card:hover .product-img { transform: scale(1.05); }
   
-  /* ИСПРАВЛЕННЫЙ ЗАГОЛОВОК С МНОГОТОЧИЕМ */
   .product-title { 
-    font-size: 11px; 
-    text-transform: uppercase; 
-    font-weight: 600; 
-    letter-spacing: 1px; 
-    margin-bottom: 5px; 
-    cursor: pointer;
-    display: -webkit-box;
-    -webkit-line-clamp: 2; /* Ограничение в 2 строки */
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-height: 32px; /* Резервируем место под 2 строки, чтобы кнопки не прыгали */
+    font-size: 11px; text-transform: uppercase; font-weight: 600; letter-spacing: 1px; margin-bottom: 5px; cursor: pointer;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; min-height: 32px;
   }
 
   .product-price { color: #666; font-family: 'Cormorant Garamond'; font-size: 20px; font-style: italic; margin-bottom: 15px; }
@@ -82,7 +71,9 @@ const style = `
   .product-detail-content { background: #fff; width: 90%; max-width: 1100px; max-height: 90vh; display: flex; position: relative; overflow-y: auto; }
   .product-detail-img { width: 55%; height: 700px; object-fit: cover; }
   .product-detail-info { padding: 60px; display: flex; flex-direction: column; flex-grow: 1; justify-content: center; }
-  .close-detail { position: absolute; top: 30px; right: 30px; cursor: pointer; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.5; }
+  
+  /* Стандартная кнопка закрытия (для ПК) */
+  .close-detail { position: absolute; top: 30px; right: 30px; cursor: pointer; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.5; z-index: 3005; }
 
   #cart-sidebar { position: fixed; right: -550px; top: 0; width: 500px; height: 100%; background: #fff; box-shadow: -20px 0 60px rgba(0,0,0,0.15); z-index: 2000; transition: 0.5s cubic-bezier(0.2, 1, 0.3, 1); display: flex; flex-direction: column; }
   #cart-sidebar.open { right: 0; }
@@ -99,6 +90,18 @@ const style = `
     .product-detail-content { flex-direction: column; }
     .product-detail-img { width: 100%; height: 300px; }
     #cart-sidebar { width: 100%; }
+    
+    /* ФИКС ДЛЯ МОБИЛЬНЫХ: Кнопка закрытия прилипает к экрану */
+    .close-detail {
+      position: fixed; /* Теперь она зафиксирована относительно экрана */
+      top: 20px; 
+      right: 20px; 
+      background: rgba(255, 255, 255, 0.9); /* Добавил фон, чтобы было видно на фото */
+      padding: 8px 12px; 
+      opacity: 1; 
+      border-radius: 4px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
   }
 </style>
 `;
