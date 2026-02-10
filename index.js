@@ -72,8 +72,6 @@ const style = `
   .product-detail-img { width: 55%; height: 700px; object-fit: cover; }
   .product-detail-info { padding: 60px; display: flex; flex-direction: column; flex-grow: 1; justify-content: center; }
   
-  /* Кнопка закрытия сверху УДАЛЕНА, так как мы перенесли её вниз */
-
   #cart-sidebar { position: fixed; right: -550px; top: 0; width: 500px; height: 100%; background: #fff; box-shadow: -20px 0 60px rgba(0,0,0,0.15); z-index: 2000; transition: 0.5s cubic-bezier(0.2, 1, 0.3, 1); display: flex; flex-direction: column; }
   #cart-sidebar.open { right: 0; }
   .cart-header { padding: 40px; border-bottom: 1px solid #f5f5f5; }
@@ -121,22 +119,24 @@ app.get('/', async (req, res) => {
             <h2 id="detail-title"></h2>
             <div id="detail-price"></div>
             <p id="detail-desc"></p>
-            
             <button id="detail-buy-btn" class="buy-btn">Add to Bag</button>
-            
             <button class="buy-btn" onclick="closeDetail()" style="margin-top: 15px;">&larr; Back</button>
           </div>
         </div>
       </div>
       
       <div id="cart-sidebar">
-        <div class="cart-header"><h2 style="margin:0;">Your Bag</h2><div onclick="toggleCart()" style="cursor:pointer; font-size:10px; margin-top:10px;">CLOSE [×]</div></div>
+        <div class="cart-header"><h2 style="margin:0;">Your Bag</h2></div>
+        
         <div class="cart-body"><div id="cart-items"></div><div id="shipping-form" style="display:none; margin-top:30px;">
           <input id="cust-name" class="input-field" placeholder="Full Name"><input id="cust-email" class="input-field" placeholder="Email">
         </div></div>
+        
         <div class="cart-footer">
           <div style="display:flex; justify-content:space-between; margin-bottom:20px;"><span>Total</span><span id="total-val">$0</span></div>
           <button id="main-cart-btn" class="buy-btn" style="background:#1a1a1a; color:#fff;" onclick="showOrderForm()">Checkout</button>
+          
+          <button class="buy-btn" onclick="toggleCart()" style="margin-top: 15px;">&rarr; Back</button>
         </div>
       </div>
 
@@ -155,7 +155,8 @@ app.get('/', async (req, res) => {
         function toggleCart() { document.getElementById('cart-sidebar').classList.toggle('open'); }
         function addToCart(n, p, img) {
           if (cart[n]) cart[n].qty++; else cart[n] = { price: p, qty: 1, image: img };
-          updateCart(); if(!document.getElementById('cart-sidebar').classList.contains('open')) toggleCart();
+          updateCart(); 
+          // АВТОМАТИЧЕСКОЕ ОТКРЫТИЕ КОРЗИНЫ УБРАНО
         }
         function changeQty(n, d) { cart[n].qty += d; if (cart[n].qty <= 0) delete cart[n]; updateCart(); }
         function updateCart() {
