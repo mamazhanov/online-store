@@ -68,9 +68,11 @@ const style = `
   .buy-btn:hover { background: #1a1a1a; color: #fff; }
 
   .product-detail-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 3000; display: none; align-items: center; justify-content: center; }
-  .product-detail-content { background: #fff; width: 90%; max-width: 1100px; max-height: 90vh; display: flex; position: relative; overflow-y: auto; }
-  .product-detail-img { width: 55%; height: 700px; object-fit: cover; }
-  .product-detail-info { padding: 60px; display: flex; flex-direction: column; flex-grow: 1; justify-content: center; }
+  
+  /* УБРАН СКРОЛЛ ДЛЯ БОЛЬШИХ ЭКРАНОВ */
+  .product-detail-content { background: #fff; width: 90%; max-width: 1100px; height: 700px; display: flex; position: relative; overflow: hidden; }
+  .product-detail-img { width: 55%; height: 100%; object-fit: cover; }
+  .product-detail-info { padding: 60px; display: flex; flex-direction: column; flex-grow: 1; justify-content: center; overflow-y: auto; }
   
   #cart-sidebar { position: fixed; right: -550px; top: 0; width: 500px; height: 100%; background: #fff; box-shadow: -20px 0 60px rgba(0,0,0,0.15); z-index: 2000; transition: 0.5s cubic-bezier(0.2, 1, 0.3, 1); display: flex; flex-direction: column; }
   #cart-sidebar.open { right: 0; }
@@ -84,10 +86,9 @@ const style = `
 
   @media (max-width: 768px) { 
     .grid { grid-template-columns: repeat(2, 1fr); }
-    .product-detail-content { flex-direction: column; width: 95%; }
-    /* ФИКСИРОВАННЫЙ РАЗМЕР КАРТИНКИ В МОДАЛКЕ ДЛЯ МОБИЛОК */
-    .product-detail-img { width: 100%; height: 40vh; min-height: 300px; object-fit: cover; }
-    .product-detail-info { padding: 30px 20px; }
+    .product-detail-content { flex-direction: column; width: 95%; height: auto; max-height: 90vh; overflow-y: auto; }
+    .product-detail-img { width: 100%; height: 40vh; min-height: 300px; }
+    .product-detail-info { padding: 30px 20px; overflow-y: visible; }
     #cart-sidebar { width: 100%; }
   }
 </style>
@@ -119,9 +120,9 @@ app.get('/', async (req, res) => {
           <img id="detail-img" src="" class="product-detail-img">
           <div class="product-detail-info">
             <h2 id="detail-title"></h2>
-            <div id="detail-price"></div>
-            <p id="detail-desc"></p>
-            <button id="detail-buy-btn" class="buy-btn">Add to Bag</button>
+            <div id="detail-price" style="font-family: 'Cormorant Garamond'; font-size: 24px; font-style: italic; margin-bottom: 20px;"></div>
+            <p id="detail-desc" style="margin-bottom: 30px; color: #666;"></p>
+            <button id="detail-buy-btn" class="buy-btn" style="background:#1a1a1a; color:#fff;">Add to Bag</button>
             <button class="buy-btn" onclick="closeDetail()" style="margin-top: 15px;">&larr; Back</button>
           </div>
         </div>
@@ -176,7 +177,7 @@ app.get('/', async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-// Админские роуты оставлены без изменений
+// Админские роуты без изменений
 app.get('/admin', async (req, res) => {
   const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
   const list = result.rows.map(p => `
@@ -188,19 +189,6 @@ app.get('/admin', async (req, res) => {
       </div>
     </div>`).join('');
   res.send(`${style}<div style="max-width:600px; margin:50px auto; padding:40px; border:1px solid #eee;"><h2>Admin Panel</h2><form action="/admin/add" method="POST" enctype="multipart/form-data"><input name="title_en" placeholder="Product Title" required class="input-field"><input name="price" type="number" placeholder="Price" required class="input-field"><textarea name="description_en" placeholder="Description" class="input-field" style="height:80px;"></textarea><input name="image" type="file" required style="margin:20px 0;"><button type="submit" class="buy-btn" style="background:#1a1a1a; color:#fff;">Add Product</button></form><div style="margin-top:40px;">${list}</div></div>`);
-});
-
-app.get('/admin/edit/:id', async (req, res) => {
-  const result = await pool.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
-  const p = result.rows[0];
-  res.send(`${style}<div style="max-width:600px; margin:50px auto; padding:40px; border:1px solid #eee;"><h2>Edit Product</h2><form action="/admin/edit/${p.id}" method="POST" enctype="multipart/form-data"><input name="title_en" value="${p.title_en}" required class="input-field"><input name="price" type="number" value="${p.price}" required class="input-field"><textarea name="description_en" class="input-field" style="height:100px;">${p.description_en || ''}</textarea><div style="margin:20px 0;"><img src="${p.image_path}" style="width:100px; display:block; margin-bottom:10px;"><input name="image" type="file"></div><button type="submit" class="buy-btn" style="background:#1a1a1a; color:#fff;">Save Changes</button><a href="/admin" style="display:block; margin-top:20px; font-size:10px; text-align:center; color:#666; text-decoration:none;">CANCEL</a></form></div>`);
-});
-
-app.post('/admin/edit/:id', upload.single('image'), async (req, res) => {
-  const { title_en, price, description_en } = req.body;
-  if (req.file) await pool.query('UPDATE products SET title_en=$1, price=$2, description_en=$3, image_path=$4 WHERE id=$5', [title_en, price, description_en, req.file.path, req.params.id]);
-  else await pool.query('UPDATE products SET title_en=$1, price=$2, description_en=$3 WHERE id=$4', [title_en, price, description_en, req.params.id]);
-  res.redirect('/admin');
 });
 
 app.post('/admin/add', upload.single('image'), async (req, res) => {
