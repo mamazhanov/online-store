@@ -6,7 +6,6 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const app = express();
 
-// --- НАСТРОЙКИ ОБЛАКА ---
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_NAME,
   api_key: process.env.CLOUDINARY_KEY,
@@ -27,7 +26,6 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false } 
 });
 
-// --- ЕДИНЫЙ СТИЛЬ (ВКЛЮЧАЯ ФИКС КНОПОК) ---
 const style = `
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Montserrat:wght@300;400;500;600&display=swap');
@@ -48,7 +46,6 @@ const style = `
 
   .container { max-width: 1400px; margin: 100px auto; padding: 0 5%; }
   
-  /* Сетка и выравнивание */
   .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 40px 20px; }
   .product-card { display: flex; flex-direction: column; height: 100%; transition: 0.4s; }
   
@@ -56,10 +53,24 @@ const style = `
   .product-img { width: 100%; height: 100%; object-fit: cover; transition: 0.6s cubic-bezier(0.2, 1, 0.3, 1); }
   .product-card:hover .product-img { transform: scale(1.05); }
   
-  .product-title { font-size: 11px; text-transform: uppercase; font-weight: 600; letter-spacing: 1px; margin-bottom: 5px; cursor: pointer; }
+  /* ИСПРАВЛЕННЫЙ ЗАГОЛОВОК С МНОГОТОЧИЕМ */
+  .product-title { 
+    font-size: 11px; 
+    text-transform: uppercase; 
+    font-weight: 600; 
+    letter-spacing: 1px; 
+    margin-bottom: 5px; 
+    cursor: pointer;
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* Ограничение в 2 строки */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-height: 32px; /* Резервируем место под 2 строки, чтобы кнопки не прыгали */
+  }
+
   .product-price { color: #666; font-family: 'Cormorant Garamond'; font-size: 20px; font-style: italic; margin-bottom: 15px; }
 
-  /* Кнопка теперь прижата к низу карточки */
   .buy-btn { 
     border: 1px solid #1a1a1a; background: none; padding: 15px 20px; text-transform: uppercase; 
     font-size: 10px; letter-spacing: 2px; cursor: pointer; width: 100%; transition: 0.3s; font-weight: 600; 
@@ -67,14 +78,12 @@ const style = `
   }
   .buy-btn:hover { background: #1a1a1a; color: #fff; }
 
-  /* Модальное окно */
   .product-detail-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 3000; display: none; align-items: center; justify-content: center; }
   .product-detail-content { background: #fff; width: 90%; max-width: 1100px; max-height: 90vh; display: flex; position: relative; overflow-y: auto; }
   .product-detail-img { width: 55%; height: 700px; object-fit: cover; }
   .product-detail-info { padding: 60px; display: flex; flex-direction: column; flex-grow: 1; justify-content: center; }
   .close-detail { position: absolute; top: 30px; right: 30px; cursor: pointer; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.5; }
 
-  /* Корзина (Sidebar) */
   #cart-sidebar { position: fixed; right: -550px; top: 0; width: 500px; height: 100%; background: #fff; box-shadow: -20px 0 60px rgba(0,0,0,0.15); z-index: 2000; transition: 0.5s cubic-bezier(0.2, 1, 0.3, 1); display: flex; flex-direction: column; }
   #cart-sidebar.open { right: 0; }
   .cart-header { padding: 40px; border-bottom: 1px solid #f5f5f5; }
@@ -94,7 +103,6 @@ const style = `
 </style>
 `;
 
-// --- ГЛАВНАЯ СТРАНИЦА ---
 app.get('/', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
@@ -162,13 +170,16 @@ app.get('/', async (req, res) => {
           document.getElementById('count').innerText = count; document.getElementById('total-val').innerText = '$' + total;
         }
         function showOrderForm() { document.getElementById('shipping-form').style.display = 'block'; document.getElementById('main-cart-btn').innerText = 'Pay Now'; document.getElementById('main-cart-btn').onclick = checkout; }
-        async function checkout() { /* Stripe logic as before */ }
+        async function checkout() {
+            const customer = { name: document.getElementById('cust-name').value, email: document.getElementById('cust-email').value };
+            const res = await fetch('/create-checkout-session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: Object.keys(cart).map(n => ({ name: n, price: cart[n].price, qty: cart[n].qty })), customer }) });
+            const { url } = await res.json(); if (url) window.location.href = url;
+        }
       </script>
     </body></html>`);
   } catch (err) { res.status(500).send(err.message); }
 });
 
-// --- ПОЛНАЯ АДМИНКА ---
 app.get('/admin', async (req, res) => {
   const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
   const list = result.rows.map(p => `
@@ -226,6 +237,17 @@ app.post('/admin/delete/:id', async (req, res) => {
   res.redirect('/admin');
 });
 
-app.post('/create-checkout-session', async (req, res) => { /* Stripe implementation */ });
+app.post('/create-checkout-session', async (req, res) => {
+  try {
+    const { items, customer } = req.body;
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      customer_email: customer.email,
+      line_items: items.map(i => ({ price_data: { currency: 'usd', product_data: { name: i.name }, unit_amount: i.price * 100 }, quantity: i.qty })),
+      mode: 'payment', success_url: `${req.headers.origin}/?status=success`, cancel_url: `${req.headers.origin}/?status=cancel`,
+    });
+    res.json({ url: session.url });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 app.listen(process.env.PORT || 3000);
