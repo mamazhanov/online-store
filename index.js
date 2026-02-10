@@ -48,7 +48,6 @@ const style = `
 
   .container { max-width: 1400px; margin: 100px auto; padding: 0 5%; }
   
-  /* Сетка товаров */
   .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 40px 20px; }
 
   @media (max-width: 1024px) { .grid { grid-template-columns: repeat(3, 1fr); } }
@@ -87,7 +86,7 @@ const style = `
   .product-detail-info { padding: 60px; display: flex; flex-direction: column; flex-grow: 1; justify-content: center; }
   .close-detail { position: absolute; top: 30px; right: 30px; cursor: pointer; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.5; z-index: 10; }
 
-  /* Боковая корзина */
+  /* Корзина */
   #cart-sidebar { 
     position: fixed; right: -550px; top: 0; width: 500px; height: 100%; 
     background: #fff; box-shadow: -20px 0 60px rgba(0,0,0,0.15); z-index: 2000; 
@@ -110,9 +109,7 @@ const style = `
 app.get('/', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
-    
     let productsHtml = result.rows.map(p => {
-      // Подготовка данных для JS, чтобы избежать проблем с кавычками в описании
       const productData = JSON.stringify(p).replace(/'/g, "&apos;");
       return `
         <div class="product-card">
@@ -187,40 +184,29 @@ app.get('/', async (req, res) => {
 
         <script>
           let cart = {}; 
-          
           function openDetail(product) {
             document.getElementById('detail-img').src = product.image_path;
             document.getElementById('detail-title').innerText = product.title_en;
             document.getElementById('detail-price').innerText = '$' + product.price;
-            document.getElementById('detail-desc').innerText = product.description_en || 'A unique piece of Kyrgyz craftsmanship, blending ancient traditions with modern aesthetic.';
-            
+            document.getElementById('detail-desc').innerText = product.description_en || 'Kyrgyz Modern Heritage piece.';
             const btn = document.getElementById('detail-buy-btn');
             btn.onclick = () => { addToCart(product.title_en, product.price, product.image_path); closeDetail(); };
-            
             document.getElementById('product-detail').style.display = 'flex';
             document.body.style.overflow = 'hidden';
           }
-
-          function closeDetail() {
-            document.getElementById('product-detail').style.display = 'none';
-            document.body.style.overflow = 'auto';
-          }
-
+          function closeDetail() { document.getElementById('product-detail').style.display = 'none'; document.body.style.overflow = 'auto'; }
           function toggleCart() { document.getElementById('cart-sidebar').classList.toggle('open'); }
-
           function addToCart(n, p, img) { 
             if (cart[n]) cart[n].qty++;
             else cart[n] = { price: p, qty: 1, image: img };
             updateCart(); 
             if(!document.getElementById('cart-sidebar').classList.contains('open')) toggleCart();
           }
-
           function changeQty(n, delta) {
             cart[n].qty += delta;
             if (cart[n].qty <= 0) delete cart[n];
             updateCart();
           }
-
           function updateCart() {
             const itemsDiv = document.getElementById('cart-items');
             let total = 0, count = 0;
@@ -232,7 +218,7 @@ app.get('/', async (req, res) => {
                   <img src="\${item.image}" class="cart-item-img">
                   <div style="flex-grow:1;">
                     <div style="font-size:11px; font-weight:600; text-transform:uppercase;">\${n}</div>
-                    <div style="font-family:'Cormorant Garamond'; font-size:18px; font-style:italic;">$\${item.price}</div>
+                    <div style="font-family:'Cormorant Garamond'; font-size:18px;">$\${item.price}</div>
                   </div>
                   <div style="display:flex; align-items:center; gap:10px;">
                     <button class="qty-btn" onclick="changeQty('\${n}', -1)">-</button>
@@ -244,31 +230,12 @@ app.get('/', async (req, res) => {
             document.getElementById('count').innerText = count;
             document.getElementById('total-val').innerText = '$' + total;
           }
-
-          function showOrderForm() {
-            if(Object.keys(cart).length === 0) return alert('Your bag is empty');
-            document.getElementById('shipping-form').style.display = 'block';
-            const btn = document.getElementById('main-cart-btn');
-            btn.innerText = 'Complete Purchase';
-            btn.onclick = checkout;
-          }
-
+          function showOrderForm() { document.getElementById('shipping-form').style.display = 'block'; document.getElementById('main-cart-btn').innerText = 'Complete Purchase'; document.getElementById('main-cart-btn').onclick = checkout; }
           async function checkout() {
-            const customer = {
-              name: document.getElementById('cust-name').value,
-              email: document.getElementById('cust-email').value,
-              address: document.getElementById('cust-address').value
-            };
-            if (!customer.name || !customer.email) return alert('Please fill in your details');
-            
-            const itemsArr = Object.keys(cart).map(n => ({ name: n, price: cart[n].price, qty: cart[n].qty }));
-            const res = await fetch('/create-checkout-session', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ items: itemsArr, customer })
-            });
-            const { url } = await res.json();
-            if (url) window.location.href = url;
+            const customer = { name: document.getElementById('cust-name').value, email: document.getElementById('cust-email').value, address: document.getElementById('cust-address').value };
+            if (!customer.name || !customer.email) return alert('Fill details');
+            const res = await fetch('/create-checkout-session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: Object.keys(cart).map(n => ({ name: n, price: cart[n].price, qty: cart[n].qty })), customer }) });
+            const { url } = await res.json(); if (url) window.location.href = url;
           }
           window.onload = () => { if (new URLSearchParams(window.location.search).get('status') === 'success') document.getElementById('status-modal').style.display = 'flex'; };
           function closeModal() { window.location.href = '/'; }
@@ -279,25 +246,7 @@ app.get('/', async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-// Роуты оплаты и Админки
-app.post('/create-checkout-session', async (req, res) => {
-  try {
-    const { items, customer } = req.body;
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      customer_email: customer.email,
-      line_items: items.map(i => ({
-        price_data: { currency: 'usd', product_data: { name: i.name }, unit_amount: i.price * 100 },
-        quantity: i.qty,
-      })),
-      mode: 'payment',
-      success_url: `${req.headers.origin}/?status=success`,
-      cancel_url: `${req.headers.origin}/?status=cancel`,
-    });
-    res.json({ url: session.url });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
+// АДМИНКА
 app.get('/admin', async (req, res) => {
   const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
   const items = result.rows.map(p => `
@@ -306,7 +255,10 @@ app.get('/admin', async (req, res) => {
         <img src="${p.image_path}" style="width:50px; height:50px; object-fit:cover;">
         <span style="font-size:12px; font-weight:600;">${p.title_en}</span>
       </div>
-      <form action="/admin/delete/${p.id}" method="POST"><button type="submit" style="color:red; background:none; border:none; cursor:pointer;">Delete</button></form>
+      <div style="display:flex; gap:10px;">
+        <a href="/admin/edit/${p.id}" style="text-decoration:none; color:blue; font-size:12px;">Edit</a>
+        <form action="/admin/delete/${p.id}" method="POST" onsubmit="return confirm('Delete?')"><button type="submit" style="color:red; background:none; border:none; cursor:pointer; font-size:12px;">Delete</button></form>
+      </div>
     </div>
   `).join('');
   res.send(`${style}<div style="max-width:600px; margin:50px auto; padding:40px; border:1px solid #eee;">
@@ -314,12 +266,42 @@ app.get('/admin', async (req, res) => {
     <form action="/admin/add" method="POST" enctype="multipart/form-data">
       <input name="title_en" placeholder="Product Name" required class="input-field">
       <input name="price" type="number" placeholder="Price (USD)" required class="input-field">
-      <textarea name="description_en" placeholder="Full Description" class="input-field" style="height:120px; border:1px solid #ddd; padding:10px;"></textarea>
+      <textarea name="description_en" placeholder="Full Description" class="input-field" style="height:100px;"></textarea>
       <input name="image" type="file" required style="margin:20px 0;">
       <button type="submit" class="buy-btn" style="background:#1a1a1a; color:#fff;">Upload Product</button>
     </form>
     <div style="margin-top:50px;">${items}</div>
   </div>`);
+});
+
+app.get('/admin/edit/:id', async (req, res) => {
+  const result = await pool.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
+  const p = result.rows[0];
+  if (!p) return res.redirect('/admin');
+  res.send(`${style}<div style="max-width:600px; margin:50px auto; padding:40px; border:1px solid #eee;">
+    <h2>Edit Product</h2>
+    <form action="/admin/edit/${p.id}" method="POST" enctype="multipart/form-data">
+      <input name="title_en" value="${p.title_en}" required class="input-field">
+      <input name="price" type="number" value="${p.price}" required class="input-field">
+      <textarea name="description_en" class="input-field" style="height:150px;">${p.description_en || ''}</textarea>
+      <div style="margin:20px 0; display:flex; align-items:center; gap:20px;">
+        <img src="${p.image_path}" style="width:80px;">
+        <input name="image" type="file">
+      </div>
+      <button type="submit" class="buy-btn" style="background:#1a1a1a; color:#fff;">Save Changes</button>
+      <a href="/admin" style="display:block; text-align:center; margin-top:20px; font-size:11px; text-decoration:none; color:#666;">Cancel</a>
+    </form>
+  </div>`);
+});
+
+app.post('/admin/edit/:id', upload.single('image'), async (req, res) => {
+  const { title_en, price, description_en } = req.body;
+  if (req.file) {
+    await pool.query('UPDATE products SET title_en=$1, price=$2, description_en=$3, image_path=$4 WHERE id=$5', [title_en, price, description_en, req.file.path, req.params.id]);
+  } else {
+    await pool.query('UPDATE products SET title_en=$1, price=$2, description_en=$3 WHERE id=$4', [title_en, price, description_en, req.params.id]);
+  }
+  res.redirect('/admin');
 });
 
 app.post('/admin/add', upload.single('image'), async (req, res) => {
@@ -331,6 +313,19 @@ app.post('/admin/add', upload.single('image'), async (req, res) => {
 app.post('/admin/delete/:id', async (req, res) => {
   await pool.query('DELETE FROM products WHERE id = $1', [req.params.id]);
   res.redirect('/admin');
+});
+
+app.post('/create-checkout-session', async (req, res) => {
+  try {
+    const { items, customer } = req.body;
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      customer_email: customer.email,
+      line_items: items.map(i => ({ price_data: { currency: 'usd', product_data: { name: i.name }, unit_amount: i.price * 100 }, quantity: i.qty })),
+      mode: 'payment', success_url: `${req.headers.origin}/?status=success`, cancel_url: `${req.headers.origin}/?status=cancel`,
+    });
+    res.json({ url: session.url });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.listen(process.env.PORT || 3000);
