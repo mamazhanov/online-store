@@ -338,7 +338,10 @@ app.post('/create-paypal-order', async (req, res) => {
       },
       items: items.map(i => ({
         name: i.name,
-        unit_amount: { currency_code: 'USD', value: i.price.toString() },
+        unit_amount: { 
+        currency_code: 'USD', 
+        value: parseFloat(i.price).toFixed(2) // Гарантируем формат 0.00
+        },
         quantity: i.qty.toString()
       }))
     }]
