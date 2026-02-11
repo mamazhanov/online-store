@@ -218,8 +218,8 @@ app.get('/', async (req, res) => {
 
         function showOrderForm() { 
           document.getElementById('shipping-form').style.display = 'block'; 
-          document.getElementById('main-cart-btn').style.display = 'none'; // Прячем обычную кнопку
-          initPayPal(); // Инициализируем PayPal
+          document.getElementById('main-cart-btn').style.display = 'none';
+          initPayPal();
         }
         
         function initPayPal() {
@@ -235,15 +235,27 @@ app.get('/', async (req, res) => {
               });
             },
             onApprove: function(data, actions) {
-              return actions.order.capture().then(function(details) {
-                const customer = {
+              return actions.order.capture().then(async function(details) {
+                const customerData = {
                   name: document.getElementById('cust-name').value,
                   email: document.getElementById('cust-email').value,
                   phone: document.getElementById('cust-phone').value,
                   address: document.getElementById('cust-address').value,
                   zip: document.getElementById('cust-zip').value
                 };
-                console.log('Payment Completed by ' + details.payer.name.given_name, customer);
+
+                // СОХРАНЕНИЕ В БАЗУ
+                await fetch('/save-order', {
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json' },
+                   body: JSON.stringify({
+                     customer: customerData,
+                     items: cart,
+                     total: totalAmount,
+                     paypal_id: details.id
+                   })
+                });
+
                 alert('Transaction completed by ' + details.payer.name.given_name);
                 window.location.href = '/?status=success';
               });
@@ -255,7 +267,20 @@ app.get('/', async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-// Админские роуты остаются БЕЗ ИЗМЕНЕНИЙ
+// НОВЫЙ РОУТ ДЛЯ СОХРАНЕНИЯ ЗАКАЗА
+app.post('/save-order', async (req, res) => {
+  try {
+    const { customer, items, total, paypal_id } = req.body;
+    await pool.query(
+      'INSERT INTO orders (customer_name, customer_email, customer_phone, customer_address, customer_zip, items, total, paypal_order_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [customer.name, customer.email, customer.phone, customer.address, customer.zip, JSON.stringify(items), total, paypal_id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/admin', async (req, res) => {
   const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
   const list = result.rows.map(p => `
@@ -295,7 +320,5 @@ app.post('/admin/delete/:id', async (req, res) => {
   await pool.query('DELETE FROM products WHERE id = $1', [req.params.id]);
   res.redirect('/admin');
 });
-
-// УДАЛЕН Stripe роут, так как PayPal работает напрямую с фронтенда
 
 app.listen(process.env.PORT || 3000);
