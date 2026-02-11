@@ -3,8 +3,16 @@ const { Pool } = require('pg');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+// Подключаем PayPal SDK
+const paypal = require('@paypal/checkout-server-sdk');
+
 const app = express();
+
+// Настройка PayPal окружения
+const clientId = process.env.PAYPAL_CLIENT_ID;
+const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+const environment = new paypal.core.SandboxEnvironment(clientId, clientSecret);
+const paypalClient = new paypal.core.PayPalHttpClient(environment);
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_NAME,
@@ -26,6 +34,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false } 
 });
 
+// ТВОИ ОРИГИНАЛЬНЫЕ СТИЛИ (БЕЗ ИЗМЕНЕНИЙ)
 const style = `
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Montserrat:wght@300;400;500;600&display=swap');
@@ -128,7 +137,7 @@ app.get('/', async (req, res) => {
     }).join('');
 
     res.send(`<!DOCTYPE html><html><head><title>Kyrgyz Modern</title><meta name="viewport" content="width=device-width, initial-scale=1">
-      <script src="https://js.stripe.com/v3/"></script>
+      <script src="https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD"></script>
       ${style}
     </head><body>
       <nav id="navbar"><a href="/" class="logo">Kyrgyz Modern</a><div class="cart-link" onclick="toggleCart()">Bag (<span id="count">0</span>)</div></nav>
@@ -158,6 +167,7 @@ app.get('/', async (req, res) => {
             <input id="cust-phone" class="input-field" placeholder="Phone Number">
             <input id="cust-address" class="input-field" placeholder="Shipping Address">
             <input id="cust-zip" class="input-field" placeholder="ZIP / Postal Code">
+            <div id="paypal-button-container" style="margin-top:20px;"></div>
           </div>
         </div>
         <div class="cart-footer">
@@ -169,7 +179,6 @@ app.get('/', async (req, res) => {
 
       <script>
         let cart = {};
-        const stripe = Stripe('pk_test_51Sxp9xCFPiebWO65YgqmqleoF2e7t5OdZ6jUlwHyHtUdC3SDydxPxuCyjS1OyNYSAuD9HqgJN40hYreU5nGQDvg8009feDtKRW');
         
         window.onscroll = function() {
           const nav = document.getElementById('navbar');
@@ -209,7 +218,6 @@ app.get('/', async (req, res) => {
 
         function changeQty(n, d) { cart[n].qty += d; if (cart[n].qty <= 0) delete cart[n]; updateCart(); }
 
-        // ИСПРАВЛЕННЫЙ UPDATECART (БЕЗ BACKTICKS ВНУТРИ)
         function updateCart() {
           let total = 0, count = 0;
           let html = '';
@@ -233,35 +241,46 @@ app.get('/', async (req, res) => {
         }
 
         function showOrderForm() { 
+          if(Object.keys(cart).length === 0) return alert('Bag is empty');
           document.getElementById('shipping-form').style.display = 'block'; 
-          document.getElementById('main-cart-btn').innerText = 'Pay Now'; 
-          document.getElementById('main-cart-btn').onclick = checkout; 
+          document.getElementById('main-cart-btn').style.display = 'none'; // Скрываем старую кнопку Pay
+          renderPayPalButtons();
         }
-        
-        async function checkout() {
-            const customer = { 
-              name: document.getElementById('cust-name').value, 
-              email: document.getElementById('cust-email').value,
-              phone: document.getElementById('cust-phone').value,
-              address: document.getElementById('cust-address').value,
-              zip: document.getElementById('cust-zip').value
-            };
-            if(!customer.email || !customer.name) return alert('Please fill in your name and email');
 
-            const res = await fetch('/create-checkout-session', { 
-              method: 'POST', 
-              headers: { 'Content-Type': 'application/json' }, 
-              body: JSON.stringify({ items: Object.keys(cart).map(n => ({ name: n, price: cart[n].price, qty: cart[n].qty })), customer }) 
-            });
-            const session = await res.json();
-            if (session.id) stripe.redirectToCheckout({ sessionId: session.id });
+        // ФУНКЦИЯ РЕНДЕРА КНОПОК PAYPAL
+        function renderPayPalButtons() {
+          if (document.getElementById('paypal-button-container').children.length > 0) return;
+
+          paypal.Buttons({
+            createOrder: function(data, actions) {
+              return fetch('/create-paypal-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  items: Object.keys(cart).map(n => ({ name: n, price: cart[n].price, qty: cart[n].qty }))
+                })
+              }).then(res => res.json()).then(order => order.id);
+            },
+            onApprove: function(data, actions) {
+              return fetch('/capture-paypal-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderID: data.orderID })
+              }).then(res => res.json()).then(details => {
+                alert('Transaction completed by ' + details.payer.name.given_name);
+                cart = {};
+                updateCart();
+                location.href = '/?status=success';
+              });
+            }
+          }).render('#paypal-button-container');
         }
       </script>
     </body></html>`);
   } catch (err) { res.status(500).send(err.message); }
 });
 
-// АДМИНКА (ПОЛНОСТЬЮ ТВОЯ)
+// АДМИНКА (ПОЛНОСТЬЮ ТВОЯ, БЕЗ ИЗМЕНЕНИЙ)
 app.get('/admin', async (req, res) => {
   const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
   const list = result.rows.map(p => `
@@ -302,27 +321,42 @@ app.post('/admin/delete/:id', async (req, res) => {
   res.redirect('/admin');
 });
 
-// STRIPE SESSION ROUTE
-app.post('/create-checkout-session', async (req, res) => {
+// PAYPAL ROUTES (ВМЕСТО STRIPE)
+app.post('/create-paypal-order', async (req, res) => {
+  const { items } = req.body;
+  const total = items.reduce((sum, i) => sum + i.price * i.qty, 0).toFixed(2);
+
+  const request = new paypal.orders.OrdersCreateRequest();
+  request.prefer("return=representation");
+  request.requestBody({
+    intent: 'CAPTURE',
+    purchase_units: [{
+      amount: {
+        currency_code: 'USD',
+        value: total,
+        breakdown: { item_total: { currency_code: 'USD', value: total } }
+      },
+      items: items.map(i => ({
+        name: i.name,
+        unit_amount: { currency_code: 'USD', value: i.price.toString() },
+        quantity: i.qty.toString()
+      }))
+    }]
+  });
+
   try {
-    const { items, customer } = req.body;
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      customer_email: customer.email,
-      line_items: items.map(i => ({
-        price_data: {
-          currency: 'usd',
-          product_data: { name: i.name },
-          unit_amount: i.price * 100,
-        },
-        quantity: i.qty,
-      })),
-      mode: 'payment',
-      success_url: `${req.headers.origin}/?status=success`,
-      cancel_url: `${req.headers.origin}/`,
-    });
-    res.json({ id: session.id });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    const order = await paypalClient.execute(request);
+    res.json({ id: order.result.id });
+  } catch (err) { res.status(500).send(err.message); }
+});
+
+app.post('/capture-paypal-order', async (req, res) => {
+  const request = new paypal.orders.OrdersCaptureRequest(req.body.orderID);
+  request.requestBody({});
+  try {
+    const capture = await paypalClient.execute(request);
+    res.json(capture.result);
+  } catch (err) { res.status(500).send(err.message); }
 });
 
 app.listen(process.env.PORT || 3000);
