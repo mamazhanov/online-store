@@ -11,7 +11,7 @@ const app = express();
 // Настройка PayPal окружения
 const clientId = process.env.PAYPAL_CLIENT_ID;
 const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
-const environment = new paypal.core.LiveEnvironment(clientId, clientSecret);
+const environment = new paypal.core.SandboxEnvironment(clientId, clientSecret);
 const paypalClient = new paypal.core.PayPalHttpClient(environment);
 
 cloudinary.config({
