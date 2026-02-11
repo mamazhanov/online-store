@@ -140,6 +140,14 @@ app.get('/', async (req, res) => {
       <script src="https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD"></script>
       ${style}
     </head><body>
+      <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('status') === 'success') {
+            alert('Order placed successfully! We will contact you soon.');
+            // Очищаем URL от параметров, чтобы алерт не вылезал при перезагрузке
+            window.history.replaceState({}, document.title, "/");
+        }
+      </script>
       <nav id="navbar"><a href="/" class="logo">Kyrgyz Modern</a><div class="cart-link" onclick="toggleCart()">Bag (<span id="count">0</span>)</div></nav>
       <div class="hero"><h1>Authentic Heritage.<br>Modern Soul.</h1></div>
       <div class="container"><div class="grid">${productsHtml}</div></div>
@@ -265,11 +273,23 @@ app.get('/', async (req, res) => {
               return fetch('/capture-paypal-order', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ orderID: data.orderID })
+                body: JSON.stringify({ 
+                  orderID: data.orderID,
+                  // Собираем данные из твоих полей ввода
+                  customerDetails: {
+                    name: document.getElementById('cust-name').value,
+                    email: document.getElementById('cust-email').value,
+                    phone: document.getElementById('cust-phone').value,
+                    address: document.getElementById('cust-address').value,
+                    zip: document.getElementById('cust-zip').value,
+                    // Превращаем корзину в текст для колонки items
+                    items: JSON.stringify(cart) 
+                  }
+                })
               }).then(res => res.json()).then(details => {
-                alert('Transaction completed by ' + details.payer.name.given_name);
                 cart = {};
                 updateCart();
+                // Перенаправляем на статус успеха
                 location.href = '/?status=success';
               });
             }
@@ -354,12 +374,38 @@ app.post('/create-paypal-order', async (req, res) => {
 });
 
 app.post('/capture-paypal-order', async (req, res) => {
-  const request = new paypal.orders.OrdersCaptureRequest(req.body.orderID);
+  const { orderID, customerDetails } = req.body;
+  const request = new paypal.orders.OrdersCaptureRequest(orderID);
   request.requestBody({});
+
   try {
     const capture = await paypalClient.execute(request);
+    
+    // Получаем итоговую сумму из ответа PayPal
+    const total = capture.result.purchase_units[0].payments.captures[0].amount.value;
+
+    // ЗАПИСЬ В ТВОЮ ТАБЛИЦУ orders
+    await pool.query(
+      `INSERT INTO orders 
+      (customer_name, customer_email, customer_phone, customer_address, customer_zip, items, total, paypal_order_id) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        customerDetails.name,
+        customerDetails.email,
+        customerDetails.phone,
+        customerDetails.address,
+        customerDetails.zip,
+        customerDetails.items,
+        total,
+        orderID
+      ]
+    );
+
     res.json(capture.result);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) { 
+    console.error('Database Error:', err);
+    res.status(500).send(err.message); 
+  }
 });
 
 app.listen(process.env.PORT || 3000);
