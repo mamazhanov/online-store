@@ -33,7 +33,25 @@ const style = `
   body { font-family: 'Montserrat', sans-serif; margin: 0; color: #1a1a1a; background: #fff; line-height: 1.6; overflow-x: hidden; }
   h1, h2, h3 { font-family: 'Cormorant Garamond', serif; font-weight: 400; text-transform: uppercase; letter-spacing: 2px; }
   
-  nav { padding: 30px 5%; display: flex; justify-content: space-between; align-items: center; position: absolute; width: 90%; z-index: 100; color: #fff; }
+  /* ФИКСИРОВАННАЯ ШАПКА */
+  nav { 
+    padding: 20px 5%; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    position: fixed; 
+    top: 0;
+    left: 0;
+    width: 90%; 
+    z-index: 4000; 
+    color: #fff; 
+    transition: 0.3s;
+    background: transparent;
+  }
+  /* Класс для изменения фона при скролле (добавляется через JS ниже) */
+  nav.scrolled { background: rgba(255,255,255,0.9); color: #000; backdrop-filter: blur(10px); box-shadow: 0 2px 20px rgba(0,0,0,0.05); }
+  nav.scrolled .logo, nav.scrolled .cart-link { color: #000; border-color: #000; }
+
   .logo { font-size: 24px; letter-spacing: 5px; text-transform: uppercase; text-decoration: none; color: #fff; font-weight: 600; }
   .cart-link { cursor: pointer; text-transform: uppercase; font-size: 11px; letter-spacing: 2px; border-bottom: 1px solid rgba(255,255,255,0.5); padding-bottom: 5px; transition: 0.3s; }
 
@@ -63,16 +81,19 @@ const style = `
   .buy-btn { 
     border: 1px solid #1a1a1a; background: none; padding: 15px 20px; text-transform: uppercase; 
     font-size: 10px; letter-spacing: 2px; cursor: pointer; width: 100%; transition: 0.3s; font-weight: 600; 
-    margin-top: auto; 
+    margin-top: auto; position: relative; overflow: hidden;
   }
   .buy-btn:hover { background: #1a1a1a; color: #fff; }
+  
+  /* АНИМАЦИЯ КНОПКИ */
+  .buy-btn.added { background: #27ae60 !important; color: #fff !important; border-color: #27ae60 !important; }
 
-  .product-detail-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 3000; display: none; align-items: center; justify-content: center; }
+  .product-detail-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 5000; display: none; align-items: center; justify-content: center; }
   .product-detail-content { background: #fff; width: 90%; max-width: 1100px; height: 700px; display: flex; position: relative; overflow: hidden; }
   .product-detail-img { width: 55%; height: 100%; object-fit: cover; }
   .product-detail-info { padding: 60px; display: flex; flex-direction: column; flex-grow: 1; justify-content: center; overflow-y: auto; }
   
-  #cart-sidebar { position: fixed; right: -550px; top: 0; width: 500px; height: 100%; background: #fff; box-shadow: -20px 0 60px rgba(0,0,0,0.15); z-index: 2000; transition: 0.5s cubic-bezier(0.2, 1, 0.3, 1); display: flex; flex-direction: column; }
+  #cart-sidebar { position: fixed; right: -550px; top: 0; width: 500px; height: 100%; background: #fff; box-shadow: -20px 0 60px rgba(0,0,0,0.15); z-index: 6000; transition: 0.5s cubic-bezier(0.2, 1, 0.3, 1); display: flex; flex-direction: column; }
   #cart-sidebar.open { right: 0; }
   .cart-header { padding: 40px; border-bottom: 1px solid #f5f5f5; }
   .cart-body { padding: 40px; flex-grow: 1; overflow-y: auto; }
@@ -88,6 +109,7 @@ const style = `
     .product-detail-img { width: 100%; height: 40vh; min-height: 300px; }
     .product-detail-info { padding: 30px 20px; overflow-y: visible; }
     #cart-sidebar { width: 100%; }
+    nav { width: 90%; }
   }
 </style>
 `;
@@ -104,12 +126,12 @@ app.get('/', async (req, res) => {
           </div>
           <div class="product-title" onclick='openDetail(${productData})'>${p.title_en}</div>
           <div class="product-price">$${p.price}</div>
-          <button class="buy-btn" onclick="addToCart('${p.title_en.replace(/'/g, "\\'")}', ${p.price}, '${p.image_path}')">Add to Bag</button>
+          <button class="buy-btn" onclick="addToCart(event, '${p.title_en.replace(/'/g, "\\'")}', ${p.price}, '${p.image_path}')">Add to Bag</button>
         </div>`;
     }).join('');
 
     res.send(`<!DOCTYPE html><html><head><title>Kyrgyz Modern</title><meta name="viewport" content="width=device-width, initial-scale=1">${style}</head><body>
-      <nav><a href="/" class="logo">Kyrgyz Modern</a><div class="cart-link" onclick="toggleCart()">Bag (<span id="count">0</span>)</div></nav>
+      <nav id="navbar"><a href="/" class="logo">Kyrgyz Modern</a><div class="cart-link" onclick="toggleCart()">Bag (<span id="count">0</span>)</div></nav>
       <div class="hero"><h1>Authentic Heritage.<br>Modern Soul.</h1></div>
       <div class="container"><div class="grid">${productsHtml}</div></div>
 
@@ -147,21 +169,45 @@ app.get('/', async (req, res) => {
 
       <script>
         let cart = {};
+        
+        // СКРОЛЛ ШАПКИ
+        window.onscroll = function() {
+          const nav = document.getElementById('navbar');
+          if (window.pageYOffset > 50) nav.classList.add('scrolled');
+          else nav.classList.remove('scrolled');
+        };
+
         function openDetail(p) {
+          const btn = document.getElementById('detail-buy-btn');
           document.getElementById('detail-img').src = p.image_path;
           document.getElementById('detail-title').innerText = p.title_en;
           document.getElementById('detail-price').innerText = '$' + p.price;
           document.getElementById('detail-desc').innerText = p.description_en || 'Handcrafted Kyrgyz piece.';
-          document.getElementById('detail-buy-btn').onclick = () => addToCart(p.title_en, p.price, p.image_path);
+          btn.innerText = 'Add to Bag';
+          btn.classList.remove('added');
+          btn.onclick = (e) => addToCart(e, p.title_en, p.price, p.image_path);
           document.getElementById('product-detail').style.display = 'flex';
           document.body.style.overflow = 'hidden';
         }
+        
         function closeDetail() { document.getElementById('product-detail').style.display = 'none'; document.body.style.overflow = 'auto'; }
         function toggleCart() { document.getElementById('cart-sidebar').classList.toggle('open'); }
-        function addToCart(n, p, img) {
+        
+        function addToCart(event, n, p, img) {
+          const btn = event.currentTarget;
           if (cart[n]) cart[n].qty++; else cart[n] = { price: p, qty: 1, image: img };
           updateCart(); 
+          
+          // АНИМАЦИЯ КНОПКИ
+          const originalText = btn.innerText;
+          btn.innerText = 'Added to Bag ✓';
+          btn.classList.add('added');
+          setTimeout(() => {
+            btn.innerText = originalText;
+            btn.classList.remove('added');
+          }, 1500);
         }
+
         function changeQty(n, d) { cart[n].qty += d; if (cart[n].qty <= 0) delete cart[n]; updateCart(); }
         function updateCart() {
           let total = 0, count = 0;
@@ -193,7 +239,7 @@ app.get('/', async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-// Админские роуты
+// Админские роуты (без изменений, включая фикс Edit)
 app.get('/admin', async (req, res) => {
   const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
   const list = result.rows.map(p => `
@@ -207,7 +253,6 @@ app.get('/admin', async (req, res) => {
   res.send(`${style}<div style="max-width:600px; margin:50px auto; padding:40px; border:1px solid #eee;"><h2>Admin Panel</h2><form action="/admin/add" method="POST" enctype="multipart/form-data"><input name="title_en" placeholder="Product Title" required class="input-field"><input name="price" type="number" placeholder="Price" required class="input-field"><textarea name="description_en" placeholder="Description" class="input-field" style="height:80px;"></textarea><input name="image" type="file" required style="margin:20px 0;"><button type="submit" class="buy-btn" style="background:#1a1a1a; color:#fff;">Add Product</button></form><div style="margin-top:40px;">${list}</div></div>`);
 });
 
-// ДОБАВЛЕННЫЙ РОУТ: ОТОБРАЖЕНИЕ СТРАНИЦЫ РЕДАКТИРОВАНИЯ
 app.get('/admin/edit/:id', async (req, res) => {
   const result = await pool.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
   const p = result.rows[0];
@@ -215,7 +260,6 @@ app.get('/admin/edit/:id', async (req, res) => {
   res.send(`${style}<div style="max-width:600px; margin:50px auto; padding:40px; border:1px solid #eee;"><h2>Edit Product</h2><form action="/admin/edit/${p.id}" method="POST" enctype="multipart/form-data"><input name="title_en" value="${p.title_en}" class="input-field"><input name="price" type="number" value="${p.price}" class="input-field"><textarea name="description_en" class="input-field" style="height:80px;">${p.description_en || ''}</textarea><div style="margin:20px 0;"><small>Current image:</small><br><img src="${p.image_path}" style="width:100px; margin:10px 0;"><br><input name="image" type="file"></div><button type="submit" class="buy-btn" style="background:#1a1a1a; color:#fff;">Save Changes</button><a href="/admin" style="display:block; text-align:center; margin-top:20px; font-size:10px; text-transform:uppercase; color:#666;">Cancel</a></form></div>`);
 });
 
-// ДОБАВЛЕННЫЙ РОУТ: СОХРАНЕНИЕ ИЗМЕНЕНИЙ
 app.post('/admin/edit/:id', upload.single('image'), async (req, res) => {
   const { title_en, price, description_en } = req.body;
   if (req.file) {
@@ -242,12 +286,7 @@ app.post('/create-checkout-session', async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       customer_email: customer.email,
-      metadata: {
-        name: customer.name,
-        phone: customer.phone,
-        address: customer.address,
-        zip: customer.zip
-      },
+      metadata: { name: customer.name, phone: customer.phone, address: customer.address, zip: customer.zip },
       line_items: items.map(i => ({ price_data: { currency: 'usd', product_data: { name: i.name }, unit_amount: i.price * 100 }, quantity: i.qty })),
       mode: 'payment', success_url: `${req.headers.origin}/?status=success`, cancel_url: `${req.headers.origin}/?status=cancel`,
     });
