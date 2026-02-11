@@ -209,7 +209,7 @@ app.get('/', async (req, res) => {
           let total = 0, count = 0;
           document.getElementById('cart-items').innerHTML = Object.keys(cart).map(n => {
             const i = cart[n]; total += i.price * i.qty; count += i.qty;
-            return \`<div style="display:flex; gap:15px; margin-bottom:20px;"><img src="\${i.image}" class="cart-item-img"><div><div style="font-size:10px; font-weight:600;">\${n}</div><div style="display:flex; align-items:center; gap:10px; margin-top:5px;"><button class="qty-btn" onclick="changeQty('\${n}',-1)">-</button>\${i.qty}<button class="qty-btn" onclick="changeQty('\${n}',1)">+</button></div></div></div>\`;
+            return '<div style="display:flex; gap:15px; margin-bottom:20px;"><img src="' + i.image + '" class="cart-item-img"><div><div style="font-size:10px; font-weight:600;">' + n + '</div><div style="display:flex; align-items:center; gap:10px; margin-top:5px;"><button class="qty-btn" onclick="changeQty(\'' + n + '\',-1)">-</button>' + i.qty + '<button class="qty-btn" onclick="changeQty(\'' + n + '\',1)">+</button></div></div></div>';
           }).join('');
           document.getElementById('count').innerText = count; 
           document.getElementById('total-val').innerText = '$' + total;
