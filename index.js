@@ -193,18 +193,37 @@ app.get('/', async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-// Админские роуты без изменений
+// Админские роуты
 app.get('/admin', async (req, res) => {
   const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
   const list = result.rows.map(p => `
     <div style="display:flex; justify-content:space-between; align-items:center; padding:15px 0; border-bottom:1px solid #eee;">
       <div style="display:flex; align-items:center; gap:10px;"><img src="${p.image_path}" style="width:40px; height:40px; object-fit:cover;"><span>${p.title_en}</span></div>
       <div style="display:flex; gap:10px;">
-        <a href="/admin/edit/${p.id}" style="font-size:10px; text-transform:uppercase; color:#000;">Edit</a>
-        <form action="/admin/delete/${p.id}" method="POST"><button style="color:red; background:none; border:none; cursor:pointer; font-size:10px; text-transform:uppercase;">Delete</button></form>
+        <a href="/admin/edit/${p.id}" style="font-size:10px; text-transform:uppercase; color:#000; text-decoration:none; border:1px solid #000; padding:5px 10px;">Edit</a>
+        <form action="/admin/delete/${p.id}" method="POST" style="margin:0;"><button style="color:red; background:none; border:none; cursor:pointer; font-size:10px; text-transform:uppercase;">Delete</button></form>
       </div>
     </div>`).join('');
   res.send(`${style}<div style="max-width:600px; margin:50px auto; padding:40px; border:1px solid #eee;"><h2>Admin Panel</h2><form action="/admin/add" method="POST" enctype="multipart/form-data"><input name="title_en" placeholder="Product Title" required class="input-field"><input name="price" type="number" placeholder="Price" required class="input-field"><textarea name="description_en" placeholder="Description" class="input-field" style="height:80px;"></textarea><input name="image" type="file" required style="margin:20px 0;"><button type="submit" class="buy-btn" style="background:#1a1a1a; color:#fff;">Add Product</button></form><div style="margin-top:40px;">${list}</div></div>`);
+});
+
+// ДОБАВЛЕННЫЙ РОУТ: ОТОБРАЖЕНИЕ СТРАНИЦЫ РЕДАКТИРОВАНИЯ
+app.get('/admin/edit/:id', async (req, res) => {
+  const result = await pool.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
+  const p = result.rows[0];
+  if (!p) return res.send("Product not found");
+  res.send(`${style}<div style="max-width:600px; margin:50px auto; padding:40px; border:1px solid #eee;"><h2>Edit Product</h2><form action="/admin/edit/${p.id}" method="POST" enctype="multipart/form-data"><input name="title_en" value="${p.title_en}" class="input-field"><input name="price" type="number" value="${p.price}" class="input-field"><textarea name="description_en" class="input-field" style="height:80px;">${p.description_en || ''}</textarea><div style="margin:20px 0;"><small>Current image:</small><br><img src="${p.image_path}" style="width:100px; margin:10px 0;"><br><input name="image" type="file"></div><button type="submit" class="buy-btn" style="background:#1a1a1a; color:#fff;">Save Changes</button><a href="/admin" style="display:block; text-align:center; margin-top:20px; font-size:10px; text-transform:uppercase; color:#666;">Cancel</a></form></div>`);
+});
+
+// ДОБАВЛЕННЫЙ РОУТ: СОХРАНЕНИЕ ИЗМЕНЕНИЙ
+app.post('/admin/edit/:id', upload.single('image'), async (req, res) => {
+  const { title_en, price, description_en } = req.body;
+  if (req.file) {
+    await pool.query('UPDATE products SET title_en=$1, price=$2, description_en=$3, image_path=$4 WHERE id=$5', [title_en, price, description_en, req.file.path, req.params.id]);
+  } else {
+    await pool.query('UPDATE products SET title_en=$1, price=$2, description_en=$3 WHERE id=$4', [title_en, price, description_en, req.params.id]);
+  }
+  res.redirect('/admin');
 });
 
 app.post('/admin/add', upload.single('image'), async (req, res) => {
