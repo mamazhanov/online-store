@@ -11,7 +11,7 @@ const app = express();
 // Настройка PayPal окружения
 const clientId = process.env.PAYPAL_CLIENT_ID;
 const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
-const environment = new paypal.core.SandboxEnvironment(clientId, clientSecret);
+const environment = new paypal.core.LiveEnvironment(clientId, clientSecret);
 const paypalClient = new paypal.core.PayPalHttpClient(environment);
 
 cloudinary.config({
@@ -144,10 +144,10 @@ app.get('/', async (req, res) => {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('status') === 'success') {
             alert('Order placed successfully! We will contact you soon.');
-            // Очищаем URL от параметров, чтобы алерт не вылезал при перезагрузке
             window.history.replaceState({}, document.title, "/");
         }
       </script>
+
       <nav id="navbar"><a href="/" class="logo">Kyrgyz Modern</a><div class="cart-link" onclick="toggleCart()">Bag (<span id="count">0</span>)</div></nav>
       <div class="hero"><h1>Authentic Heritage.<br>Modern Soul.</h1></div>
       <div class="container"><div class="grid">${productsHtml}</div></div>
@@ -251,11 +251,10 @@ app.get('/', async (req, res) => {
         function showOrderForm() { 
           if(Object.keys(cart).length === 0) return alert('Bag is empty');
           document.getElementById('shipping-form').style.display = 'block'; 
-          document.getElementById('main-cart-btn').style.display = 'none'; // Скрываем старую кнопку Pay
+          document.getElementById('main-cart-btn').style.display = 'none';
           renderPayPalButtons();
         }
 
-        // ФУНКЦИЯ РЕНДЕРА КНОПОК PAYPAL
         function renderPayPalButtons() {
           if (document.getElementById('paypal-button-container').children.length > 0) return;
 
@@ -275,21 +274,18 @@ app.get('/', async (req, res) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                   orderID: data.orderID,
-                  // Собираем данные из твоих полей ввода
                   customerDetails: {
                     name: document.getElementById('cust-name').value,
                     email: document.getElementById('cust-email').value,
                     phone: document.getElementById('cust-phone').value,
                     address: document.getElementById('cust-address').value,
                     zip: document.getElementById('cust-zip').value,
-                    // Превращаем корзину в текст для колонки items
-                    items: JSON.stringify(cart) 
+                    items: JSON.stringify(cart)
                   }
                 })
               }).then(res => res.json()).then(details => {
                 cart = {};
                 updateCart();
-                // Перенаправляем на статус успеха
                 location.href = '/?status=success';
               });
             }
@@ -300,18 +296,61 @@ app.get('/', async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-// АДМИНКА (ПОЛНОСТЬЮ ТВОЯ, БЕЗ ИЗМЕНЕНИЙ)
+// ОБНОВЛЕННАЯ АДМИНКА С ВЫВОДОМ ЗАКАЗОВ
 app.get('/admin', async (req, res) => {
-  const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
-  const list = result.rows.map(p => `
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:15px 0; border-bottom:1px solid #eee;">
-      <div style="display:flex; align-items:center; gap:10px;"><img src="${p.image_path}" style="width:40px; height:40px; object-fit:cover;"><span>${p.title_en}</span></div>
-      <div style="display:flex; gap:10px;">
-        <a href="/admin/edit/${p.id}" style="font-size:10px; text-transform:uppercase; color:#000; text-decoration:none; border:1px solid #000; padding:5px 10px;">Edit</a>
-        <form action="/admin/delete/${p.id}" method="POST" style="margin:0;"><button style="color:red; background:none; border:none; cursor:pointer; font-size:10px; text-transform:uppercase;">Delete</button></form>
-      </div>
-    </div>`).join('');
-  res.send(`${style}<div style="max-width:600px; margin:50px auto; padding:40px; border:1px solid #eee;"><h2>Admin Panel</h2><form action="/admin/add" method="POST" enctype="multipart/form-data"><input name="title_en" placeholder="Product Title" required class="input-field"><input name="price" type="number" placeholder="Price" required class="input-field"><textarea name="description_en" placeholder="Description" class="input-field" style="height:80px;"></textarea><input name="image" type="file" required style="margin:20px 0;"><button type="submit" class="buy-btn" style="background:#1a1a1a; color:#fff;">Add Product</button></form><div style="margin-top:40px;">${list}</div></div>`);
+  try {
+    const productsRes = await pool.query('SELECT * FROM products ORDER BY id DESC');
+    const ordersRes = await pool.query('SELECT * FROM orders ORDER BY created_at DESC');
+
+    const productList = productsRes.rows.map(p => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:15px 0; border-bottom:1px solid #eee;">
+        <div style="display:flex; align-items:center; gap:10px;"><img src="${p.image_path}" style="width:40px; height:40px; object-fit:cover;"><span>${p.title_en}</span></div>
+        <div style="display:flex; gap:10px;">
+          <a href="/admin/edit/${p.id}" style="font-size:10px; text-transform:uppercase; color:#000; text-decoration:none; border:1px solid #000; padding:5px 10px;">Edit</a>
+          <form action="/admin/delete/${p.id}" method="POST" style="margin:0;"><button style="color:red; background:none; border:none; cursor:pointer; font-size:10px; text-transform:uppercase;">Delete</button></form>
+        </div>
+      </div>`).join('');
+
+    const orderList = ordersRes.rows.map(o => `
+      <div style="padding:20px; border:1px solid #eee; margin-bottom:20px; font-size:12px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+          <strong style="text-transform:uppercase; letter-spacing:1px;">Order #${o.id}</strong>
+          <span style="font-style:italic; font-family:'Cormorant Garamond'; font-size:16px;">$${o.total}</span>
+        </div>
+        <div style="color:#666; margin-bottom:10px;">
+          <strong>Customer:</strong> ${o.customer_name} (${o.customer_email})<br>
+          <strong>Address:</strong> ${o.customer_address}, ${o.customer_zip}<br>
+          <strong>Phone:</strong> ${o.customer_phone}
+        </div>
+        <div style="background:#f9f9f9; padding:10px; font-size:10px;">
+          <strong>Items:</strong> ${o.items}
+        </div>
+        <div style="margin-top:10px; font-size:9px; color:#999;">PayPal: ${o.paypal_order_id} | ${new Date(o.created_at).toLocaleString()}</div>
+      </div>`).join('');
+
+    res.send(`${style}
+      <div style="max-width:1000px; margin:50px auto; padding:40px;">
+        <h1 style="text-align:center; margin-bottom:50px; letter-spacing:5px;">Management</h1>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:60px;">
+          <div>
+            <h2 style="margin-bottom:30px;">Inventory</h2>
+            <form action="/admin/add" method="POST" enctype="multipart/form-data" style="margin-bottom:40px;">
+              <input name="title_en" placeholder="Product Title" required class="input-field">
+              <input name="price" type="number" placeholder="Price" required class="input-field">
+              <textarea name="description_en" placeholder="Description" class="input-field" style="height:80px;"></textarea>
+              <input name="image" type="file" required style="margin:20px 0;">
+              <button type="submit" class="buy-btn" style="background:#1a1a1a; color:#fff;">Add Product</button>
+            </form>
+            <div>${productList}</div>
+          </div>
+          <div>
+            <h2 style="margin-bottom:30px;">Orders</h2>
+            <div style="max-height:800px; overflow-y:auto;">${orderList || '<p style="color:#999;">No orders yet.</p>'}</div>
+          </div>
+        </div>
+        <div style="margin-top:50px; text-align:center;"><a href="/" style="text-decoration:none; color:#000; font-size:10px; text-transform:uppercase;">&larr; Back to Shop</a></div>
+      </div>`);
+  } catch (err) { res.status(500).send(err.message); }
 });
 
 app.get('/admin/edit/:id', async (req, res) => {
@@ -341,7 +380,7 @@ app.post('/admin/delete/:id', async (req, res) => {
   res.redirect('/admin');
 });
 
-// PAYPAL ROUTES (ВМЕСТО STRIPE)
+// PAYPAL ROUTES С СОХРАНЕНИЕМ В БАЗУ
 app.post('/create-paypal-order', async (req, res) => {
   const { items } = req.body;
   const total = items.reduce((sum, i) => sum + i.price * i.qty, 0).toFixed(2);
@@ -358,10 +397,7 @@ app.post('/create-paypal-order', async (req, res) => {
       },
       items: items.map(i => ({
         name: i.name,
-        unit_amount: { 
-        currency_code: 'USD', 
-        value: parseFloat(i.price).toFixed(2) // Гарантируем формат 0.00
-        },
+        unit_amount: { currency_code: 'USD', value: parseFloat(i.price).toFixed(2) },
         quantity: i.qty.toString()
       }))
     }]
@@ -377,14 +413,11 @@ app.post('/capture-paypal-order', async (req, res) => {
   const { orderID, customerDetails } = req.body;
   const request = new paypal.orders.OrdersCaptureRequest(orderID);
   request.requestBody({});
-
   try {
     const capture = await paypalClient.execute(request);
-    
-    // Получаем итоговую сумму из ответа PayPal
     const total = capture.result.purchase_units[0].payments.captures[0].amount.value;
 
-    // ЗАПИСЬ В ТВОЮ ТАБЛИЦУ orders
+    // Сохранение в таблицу orders
     await pool.query(
       `INSERT INTO orders 
       (customer_name, customer_email, customer_phone, customer_address, customer_zip, items, total, paypal_order_id) 
@@ -402,10 +435,7 @@ app.post('/capture-paypal-order', async (req, res) => {
     );
 
     res.json(capture.result);
-  } catch (err) { 
-    console.error('Database Error:', err);
-    res.status(500).send(err.message); 
-  }
+  } catch (err) { res.status(500).send(err.message); }
 });
 
 app.listen(process.env.PORT || 3000);
