@@ -127,7 +127,7 @@ app.get('/', async (req, res) => {
     }).join('');
 
     res.send(`<!DOCTYPE html><html><head><title>Kyrgyz Modern</title><meta name="viewport" content="width=device-width, initial-scale=1">
-      <script src="https://www.paypal.com/sdk/js?client-id=AZQyAqXcytMduoaPE7juK3b-0AQvIQfxGaju0kfM5Au5bhXaYjmZsWIl_S64FBNKJPyPSresujUIzCA5&currency=USD"></script>
+     <script src="https://www.paypal.com/sdk/js?client-id=AdIPXageESVDqDX6MKDb8gkheEMfhd-jA0I4FiVR-BYgOoLWyy5dVjyAXbK9fbbHrupUyVYKXx94tYa3&currency=USD"></script>
       ${style}
     </head><body>
       <nav id="navbar"><a href="/" class="logo">Kyrgyz Modern</a><div class="cart-link" onclick="toggleCart()">Bag (<span id="count">0</span>)</div></nav>
