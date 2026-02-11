@@ -3,7 +3,7 @@ const { Pool } = require('pg');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+// УДАЛЕНО: const stripe = require('stripe')...
 const app = express();
 
 cloudinary.config({
@@ -33,7 +33,6 @@ const style = `
   body { font-family: 'Montserrat', sans-serif; margin: 0; color: #1a1a1a; background: #fff; line-height: 1.6; overflow-x: hidden; }
   h1, h2, h3 { font-family: 'Cormorant Garamond', serif; font-weight: 400; text-transform: uppercase; letter-spacing: 2px; }
   
-  /* ФИКСИРОВАННАЯ ШАПКА */
   nav { 
     padding: 20px 5%; 
     display: flex; 
@@ -48,7 +47,6 @@ const style = `
     transition: 0.3s;
     background: transparent;
   }
-  /* Класс для изменения фона при скролле (добавляется через JS ниже) */
   nav.scrolled { background: rgba(255,255,255,0.9); color: #000; backdrop-filter: blur(10px); box-shadow: 0 2px 20px rgba(0,0,0,0.05); }
   nav.scrolled .logo, nav.scrolled .cart-link { color: #000; border-color: #000; }
 
@@ -84,8 +82,6 @@ const style = `
     margin-top: auto; position: relative; overflow: hidden;
   }
   .buy-btn:hover { background: #1a1a1a; color: #fff; }
-  
-  /* АНИМАЦИЯ КНОПКИ */
   .buy-btn.added { background: #27ae60 !important; color: #fff !important; border-color: #27ae60 !important; }
 
   .product-detail-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 5000; display: none; align-items: center; justify-content: center; }
@@ -130,7 +126,10 @@ app.get('/', async (req, res) => {
         </div>`;
     }).join('');
 
-    res.send(`<!DOCTYPE html><html><head><title>Kyrgyz Modern</title><meta name="viewport" content="width=device-width, initial-scale=1">${style}</head><body>
+    res.send(`<!DOCTYPE html><html><head><title>Kyrgyz Modern</title><meta name="viewport" content="width=device-width, initial-scale=1">
+      <script src="https://www.paypal.com/sdk/js?client-id=YOUR_PAYPAL_CLIENT_ID&currency=USD"></script>
+      ${style}
+    </head><body>
       <nav id="navbar"><a href="/" class="logo">Kyrgyz Modern</a><div class="cart-link" onclick="toggleCart()">Bag (<span id="count">0</span>)</div></nav>
       <div class="hero"><h1>Authentic Heritage.<br>Modern Soul.</h1></div>
       <div class="container"><div class="grid">${productsHtml}</div></div>
@@ -158,6 +157,7 @@ app.get('/', async (req, res) => {
             <input id="cust-phone" class="input-field" placeholder="Phone Number">
             <input id="cust-address" class="input-field" placeholder="Shipping Address">
             <input id="cust-zip" class="input-field" placeholder="ZIP / Postal Code">
+            <div id="paypal-button-container" style="margin-top:20px;"></div>
           </div>
         </div>
         <div class="cart-footer">
@@ -169,8 +169,8 @@ app.get('/', async (req, res) => {
 
       <script>
         let cart = {};
-        
-        // СКРОЛЛ ШАПКИ
+        let totalAmount = 0;
+
         window.onscroll = function() {
           const nav = document.getElementById('navbar');
           if (window.pageYOffset > 50) nav.classList.add('scrolled');
@@ -197,49 +197,65 @@ app.get('/', async (req, res) => {
           const btn = event.currentTarget;
           if (cart[n]) cart[n].qty++; else cart[n] = { price: p, qty: 1, image: img };
           updateCart(); 
-          
-          // АНИМАЦИЯ КНОПКИ
           const originalText = btn.innerText;
           btn.innerText = 'Added to Bag ✓';
           btn.classList.add('added');
-          setTimeout(() => {
-            btn.innerText = originalText;
-            btn.classList.remove('added');
-          }, 1500);
+          setTimeout(() => { btn.innerText = originalText; btn.classList.remove('added'); }, 1500);
         }
 
         function changeQty(n, d) { cart[n].qty += d; if (cart[n].qty <= 0) delete cart[n]; updateCart(); }
+        
         function updateCart() {
           let total = 0, count = 0;
           document.getElementById('cart-items').innerHTML = Object.keys(cart).map(n => {
             const i = cart[n]; total += i.price * i.qty; count += i.qty;
             return \`<div style="display:flex; gap:15px; margin-bottom:20px;"><img src="\${i.image}" class="cart-item-img"><div><div style="font-size:10px; font-weight:600;">\${n}</div><div style="display:flex; align-items:center; gap:10px; margin-top:5px;"><button class="qty-btn" onclick="changeQty('\${n}',-1)">-</button>\${i.qty}<button class="qty-btn" onclick="changeQty('\${n}',1)">+</button></div></div></div>\`;
           }).join('');
-          document.getElementById('count').innerText = count; document.getElementById('total-val').innerText = '$' + total;
+          document.getElementById('count').innerText = count; 
+          document.getElementById('total-val').innerText = '$' + total;
+          totalAmount = total;
         }
-        function showOrderForm() { document.getElementById('shipping-form').style.display = 'block'; document.getElementById('main-cart-btn').innerText = 'Pay Now'; document.getElementById('main-cart-btn').onclick = checkout; }
+
+        function showOrderForm() { 
+          document.getElementById('shipping-form').style.display = 'block'; 
+          document.getElementById('main-cart-btn').style.display = 'none'; // Прячем обычную кнопку
+          initPayPal(); // Инициализируем PayPal
+        }
         
-        async function checkout() {
-            const customer = { 
-              name: document.getElementById('cust-name').value, 
-              email: document.getElementById('cust-email').value,
-              phone: document.getElementById('cust-phone').value,
-              address: document.getElementById('cust-address').value,
-              zip: document.getElementById('cust-zip').value
-            };
-            const res = await fetch('/create-checkout-session', { 
-              method: 'POST', 
-              headers: { 'Content-Type': 'application/json' }, 
-              body: JSON.stringify({ items: Object.keys(cart).map(n => ({ name: n, price: cart[n].price, qty: cart[n].qty })), customer }) 
-            });
-            const { url } = await res.json(); if (url) window.location.href = url;
+        function initPayPal() {
+          if (document.getElementById('paypal-button-container').children.length > 0) return;
+
+          paypal.Buttons({
+            createOrder: function(data, actions) {
+              return actions.order.create({
+                purchase_units: [{
+                  amount: { value: totalAmount.toString() },
+                  description: "Purchase from Kyrgyz Modern"
+                }]
+              });
+            },
+            onApprove: function(data, actions) {
+              return actions.order.capture().then(function(details) {
+                const customer = {
+                  name: document.getElementById('cust-name').value,
+                  email: document.getElementById('cust-email').value,
+                  phone: document.getElementById('cust-phone').value,
+                  address: document.getElementById('cust-address').value,
+                  zip: document.getElementById('cust-zip').value
+                };
+                console.log('Payment Completed by ' + details.payer.name.given_name, customer);
+                alert('Transaction completed by ' + details.payer.name.given_name);
+                window.location.href = '/?status=success';
+              });
+            }
+          }).render('#paypal-button-container');
         }
       </script>
     </body></html>`);
   } catch (err) { res.status(500).send(err.message); }
 });
 
-// Админские роуты (без изменений, включая фикс Edit)
+// Админские роуты остаются БЕЗ ИЗМЕНЕНИЙ
 app.get('/admin', async (req, res) => {
   const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
   const list = result.rows.map(p => `
@@ -280,18 +296,6 @@ app.post('/admin/delete/:id', async (req, res) => {
   res.redirect('/admin');
 });
 
-app.post('/create-checkout-session', async (req, res) => {
-  try {
-    const { items, customer } = req.body;
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      customer_email: customer.email,
-      metadata: { name: customer.name, phone: customer.phone, address: customer.address, zip: customer.zip },
-      line_items: items.map(i => ({ price_data: { currency: 'usd', product_data: { name: i.name }, unit_amount: i.price * 100 }, quantity: i.qty })),
-      mode: 'payment', success_url: `${req.headers.origin}/?status=success`, cancel_url: `${req.headers.origin}/?status=cancel`,
-    });
-    res.json({ url: session.url });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+// УДАЛЕН Stripe роут, так как PayPal работает напрямую с фронтенда
 
 app.listen(process.env.PORT || 3000);
